@@ -63,14 +63,15 @@ To retake them: `python3 tools/demo/make_demo_repo.py <folder>/orders-api`, then
 **Single purpose:** Show Mule 4 projects from the page you are on as flow diagrams, with their version history, read from the code host with your existing sign-in (or from a local clone).
 
 **Permission justifications:**
-- `activeTab`, `scripting`: when you click the button, read the current tab's URL, selected text and visible header text, to find which repository, file, lines or pull request it shows. This only happens on that click and only for that tab.
+- `activeTab`: when you click the button, read the current tab's URL, selected text and visible header text, to find which repository, file, lines or pull request it shows. Only on that click and only for that tab.
+- `scripting`: runs one small read-only function in the current tab when you click the button, to read its URL, selected text and header text. It never changes the page.
 - `nativeMessaging`: talk to the optional local helper program, which runs DataWeave scripts and, for code hosts not read directly, finds your clone and starts a server for it on your computer.
 - `storage`: remember your settings (folders with your clones, theme) and hand the page (and the local server's address, if any) to the viewer tab.
 - `contextMenus`: the "Open in Mule Flow Viewer" item on the page's right-click menu.
 - Host permissions `https://dev.azure.com/*`, `https://*.visualstudio.com/*`, `https://gitlab.com/*`, `https://bitbucket.org/*`, `https://api.github.com/*`: the viewer reads the repository you opened (files, branches, commits), its libraries and the other repositories of the same owner (for "used by") from that host's API, signed in as you are in this browser (GitHub: with the read-only token you give it). Only read requests, only after your click.
-- Host permission `http://127.0.0.1/*`: the optional helper's server on your own computer. No other host is contacted.
+- Host permission `http://127.0.0.1/*`: the optional helper's server on your own computer.
 
-**Remote code:** No. All code is in the package.
+**Remote code:** "No, I am not using remote code". All code is in the package.
 
 **Data usage:** Check none of the data types. Nothing is collected or sent to the authors or anyone else: the repository is read from your code host into your browser on your click, and stays there.
 
