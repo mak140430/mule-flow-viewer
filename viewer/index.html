@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mule Flow Viewer</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="back" class="icon-btn" title="Back">‹</button>
+    <button id="forward" class="icon-btn" title="Forward">›</button>
+    <strong id="project-name">Mule Flow Viewer</strong>
+    <button id="where" class="where" hidden></button>
+    <button id="where-back" class="icon-btn" hidden title="Back to your working copy">×</button>
+    <button id="palette-open" class="palette-hint" title="Go to a flow, file or branch, or paste a link">
+      <span>Search flows, files, branches</span><span class="kbd">⌘K</span>
+    </button>
+    <span class="spacer"></span>
+    <div class="seg">
+      <button id="xml-toggle" hidden title="Show the file's XML">XML</button>
+      <button id="history" hidden title="Commits and what they changed">History</button>
+      <button id="grid-toggle" hidden title="Elements that differ between branches">Branches</button>
+      <button id="overview-toggle" title="Entry points and their errors, what the app calls, properties per environment, library versions">Overview</button>
+      <button id="checks-toggle" hidden title="What in this project is worth a second look">Checks <span id="checks-count" class="count" hidden></span></button>
+      <button id="play-toggle" title="Your own DataWeave: inputs, variables, files, script and output">Playground</button>
+    </div>
+    <label id="colour-wrap" hidden title="Colour elements by when they last changed, or by who changed them">Colour
+      <select id="colour"><option value="">None</option><option value="age">Age</option><option value="author">Author</option></select></label>
+    <label id="env-wrap" hidden>Env <select id="env"></select></label>
+    <button id="secure-key" class="icon-btn" hidden title="Key for secure:: properties"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-3 3 2 2m-5 1 2 2"/></svg></button>
+    <label id="icons-wrap">Icons <select id="icon-pack"></select></label>
+    <button id="theme" class="icon-btn" title="Light or dark"></button>
+    <button id="open-folder">Open folder</button>
+  </header>
+  <div id="diffbar" class="diffbar" hidden>
+    <button id="branch" class="branch-button" hidden title="Branch: type to find one"></button>
+    <button id="older" class="icon-btn" title="Older commit">‹</button>
+    <select id="commit"></select>
+    <button id="newer" class="icon-btn" title="Newer commit">›</button>
+    <span id="replay-wrap" class="replay" hidden>
+      <button id="replay" class="icon-btn" title="Replay this file's commits, oldest first"></button>
+      <input type="range" id="scrub" min="0" step="1" title="Drag through this file's commits">
+    </span>
+    <label title="Only commits that touch this file or the DataWeave it uses"><input type="checkbox" id="file-only"> This file</label>
+    <span id="commit-meta" class="muted"></span>
+    <span class="spacer"></span>
+    <button id="impact-toggle" title="The endpoints, schedules and listeners that run what this changes">Impact</button>
+    <button id="notes" title="What this comparison changes, as Markdown to paste">Release notes</button>
+  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <input id="search" type="search" placeholder="Find flow or paste a link" autocomplete="off">
+      <nav id="tree"></nav>
+    </aside>
+    <div class="center">
+      <main id="main"><div class="empty-state">Open a Mule project folder to start.</div></main>
+      <div id="xml" hidden><div class="xml-resize" title="Drag to resize"></div></div>
+    </div>
+    <div id="panel-resize" hidden title="Drag to resize"></div>
+    <aside id="panel" hidden></aside>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

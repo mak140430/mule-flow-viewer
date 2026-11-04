@@ -1,0 +1,44 @@
+body.setup { display: block; overflow: auto; }
+.setup-main { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+.setup-head { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.setup-head img { width: 40px; height: 40px; }
+.setup-head h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
+.setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+.setup-card h2 { margin: 0 0 10px; font-size: 14px; }
+.setup-card.problem { border-color: var(--mod); background: color-mix(in oklch, var(--mod-soft) 60%, var(--surface)); }
+.setup-card textarea, .setup-card input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.setup-card label { display: block; margin-top: 12px; color: var(--muted); }
+.setup-card label input { margin-top: 6px; color: var(--text); }
+.setup-card ol { padding-left: 20px; line-height: 1.7; }
+.setup-card pre.code { margin: 6px 0; }
+.setup-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.helper-ok { color: var(--add); font-weight: 600; }
+
+/* welcome guide */
+.setup-head .spacer { flex: 1; }
+.guide-backdrop { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: 6vh 16px;
+  background: oklch(0.15 0.02 var(--hue) / 0.45); backdrop-filter: blur(4px); animation: fade-in .14s var(--ease); }
+.guide { width: min(680px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-lg); animation: pop-in .18s var(--ease); }
+.guide-head { display: flex; gap: 14px; align-items: center; padding: 20px 24px 14px; }
+.guide-head img { width: 44px; height: 44px; }
+.guide-head h2 { margin: 0 0 2px; font-size: 18px; letter-spacing: -0.02em; }
+.guide-steps { list-style: none; counter-reset: step; margin: 0; padding: 0 24px; }
+.guide-steps > li { counter-increment: step; position: relative; padding: 14px 0 14px 40px; border-top: 1px solid var(--border); }
+.guide-steps > li::before { content: counter(step); position: absolute; left: 0; top: 14px; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; font: 600 12px var(--sans); background: var(--accent-soft); color: var(--accent); }
+.guide-steps > li.done::before { content: "✓"; background: var(--add-soft); color: var(--add); }
+.guide-section { margin: 0; padding: 16px 24px 0; font-size: 14px; border-top: 1px solid var(--border); }
+.guide-section + p { margin: 4px 0 10px; padding: 0 24px; }
+.guide-steps h3 { margin: 0 0 4px; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.guide-steps p { margin: 4px 0; }
+.guide-steps pre.code { position: relative; margin: 8px 0; padding-right: 70px; }
+.guide-steps .copy { position: absolute; right: 6px; top: 6px; height: 24px; font-size: 11px; padding: 0 9px; }
+.guide-steps textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); margin-top: 6px; }
+.check { font: 500 11.5px var(--sans); padding: 1px 8px; border-radius: 10px; }
+.check.ok { color: var(--add); background: var(--add-soft); }
+.check.bad { color: var(--del); background: var(--del-soft); }
+.check.off { color: var(--muted); background: var(--bg); }
+.check:empty { display: none; }
+.optional { font: 500 11px var(--sans); color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; }
+.guide-foot { display: flex; align-items: center; gap: 12px; padding: 14px 24px 20px; border-top: 1px solid var(--border); }
+.setup-url { word-break: break-all; font-size: 12px; margin: 4px 0 10px; }

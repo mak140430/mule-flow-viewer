@@ -1,0 +1,10 @@
+{
+  "name": "mule-flow-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "extract-icons": "python3 tools/extract_icon_pack.py",
+    "serve": "python3 tools/serve.py",
+    "smoke": "node tools/smoke.mjs"
+  }
+}

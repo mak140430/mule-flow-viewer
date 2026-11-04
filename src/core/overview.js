@@ -1,0 +1,172 @@
+// The Overview page: what starts the app and which errors each entry point answers with (surface.js), what it
+// calls, its properties across environments (env-matrix.js), and the versions of the owner's shared libraries
+// its apps use.
+
+import { h } from './dom.js';
+import { entryPoints, outboundCalls, errorsOf, OTHER } from './surface.js';
+import { envMatrix } from './env-matrix.js';
+import { compareVersions } from '../adapters/git-host.js';
+
+export const TABS = [['endpoints', 'Entry points'], ['calls', 'Calls'], ['properties', 'Properties'], ['libraries', 'Libraries']];
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * ctx: {project, env, libraryFlows, libraryTexts, libraryMap (() => Promise) | null, artifactId, tab, onTab(tab),
+ * openFlow(name), openItem(item, flow), openSource(file, line)}
+ */
+export function renderOverview(ctx) {
+  const tabs = TABS.filter(([id]) => id !== 'libraries' || ctx.libraryMap);
+  const tab = tabs.some(([id]) => id === ctx.tab) ? ctx.tab : 'endpoints';
+  const body = { endpoints: endpointsTab, calls: callsTab, properties: propertiesTab, libraries: librariesTab }[tab](ctx);
+  return h('div.search-view.overview',
+    h('div.search-head', h('div.seg.overview-tabs', tabs.map(([id, label]) => h(`button${id === tab ? '.active' : ''}`, { onclick: () => ctx.onTab(id) }, label))),
+      body.summary ? h('span.muted', body.summary) : null),
+    body.el);
+}
+
+/** `${key}` in a setting, with the value it has in the environment shown (secure ones stay as they are). */
+function resolved(text, ctx) {
+  if (!text || !text.includes('${')) return text;
+  return text.replace(/\$\{([^}]+)\}/g, (all, k) => {
+    if (k.startsWith('secure::')) return all;
+    const r = ctx.project.resolveProperty(k, ctx.env);
+    return r && !/^!\[/.test(r.value) ? r.value : all;
+  });
+}
+
+// ------------------------------------------------------------------ entry points and their errors
+
+function endpointsTab(ctx) {
+  const entries = entryPoints(ctx.project);
+  if (!entries.length) return { el: h('p.muted', 'Nothing in this app starts a flow: it is a library, or other apps call its flows.') };
+  const shared = new Set(entries.filter((e) => e.kind === 'http').map((e) => e.label).filter((l, i, all) => all.indexOf(l) !== i));
+  const row = (e) => {
+    const errors = h('div.endpoint-errors');
+    const d = h(`details.endpoint.kind-${e.kind}`,
+      { ontoggle: () => { if (d.open && !errors.childElementCount) errors.append(errorsTable(errorsOf(ctx.project, e, { libraryFlows: ctx.libraryFlows }), e)); } },
+      h('summary',
+        e.method ? h('span.method', e.method) : null,
+        h('span.mono.endpoint-path', e.kind === 'api' || e.kind === 'http' ? e.path : resolved(e.label, ctx)),
+        e.type ? h('span.muted', ` ${e.type}`) : null,
+        shared.has(e.label) ? h('span.muted', ` ${e.config}`) : null,
+        h('span.spacer'),
+        e.routes?.length ? h('span.muted', `APIkit router · ${plural(e.routes.length, 'resource')} `) : null,
+        h('a.endpoint-flow', { onclick: (ev) => { ev.preventDefault(); ctx.openFlow(e.flow.name); } }, e.flow.name)),
+      errors);
+    return d;
+  };
+  const groups = [
+    ['HTTP', entries.filter((e) => e.kind === 'http' || e.kind === 'api')],
+    ['Schedules', entries.filter((e) => e.kind === 'schedule')],
+    ['Listeners', entries.filter((e) => e.kind === 'source')],
+  ].filter(([, list]) => list.length);
+  const counts = groups.map(([name, list]) => (name === 'HTTP'
+    ? plural(list.filter((e) => e.kind === 'api').length || list.length, list.some((e) => e.kind === 'api') ? 'API resource' : 'HTTP listener')
+    : plural(list.length, name === 'Schedules' ? 'schedule' : 'listener')));
+  return {
+    summary: counts.join(' · '),
+    el: groups.map(([name, list]) => h('section.search-file', h('div.search-file-head', name), list.map(row))),
+  };
+}
+
+const answer = (o, entry) => {
+  if (o.end === 'continue' && o.inner) return h('span.muted', 'caught; the flow goes on');
+  if (!o.status) return o.end === 'unhandled' ? h('span', 'fails') : h('span.muted', o.end === 'continue' ? 'caught' : 'fails after its handlers');
+  if (o.status.code) return [h('b.status', o.status.code), o.status.default ? h('span.muted', o.end === 'unhandled' ? " Mule's default" : ' default') : null];
+  if (o.status.setBy) return h('span', 'set by ', h('span.mono', o.status.setBy));
+  return h('span.mono', o.status.expr || '');
+};
+
+function errorsTable(rows, entry) {
+  // types with the same handling, together
+  const groups = new Map();
+  for (const r of rows) {
+    for (const o of r.outcomes) {
+      const key = JSON.stringify([o.handlers.map((x) => `${x.where}|${x.label}`), o.end, o.inner, o.status]);
+      if (!groups.has(key)) groups.set(key, { types: [], raisedBy: new Set(), o });
+      groups.get(key).types.push(r.type);
+      r.raisedBy.forEach((x) => groups.get(key).raisedBy.add(x));
+    }
+  }
+  if (!groups.size) return h('p.muted', 'No error handling on the way.');
+  return h('table.trace-vars.errors-table',
+    h('thead', h('tr', h('th', 'Error'), h('th', 'Raised by'), h('th', 'Handled by'), h('th', entry.kind === 'http' || entry.kind === 'api' ? 'Answer' : ''))),
+    h('tbody', [...groups.values()].map(({ types, raisedBy, o }) => h(`tr${o.end === 'unhandled' ? '.unhandled' : ''}`,
+      h('td.mono', types.map((t) => h('div', t === OTHER ? h('span.muted', 'anything else') : t))),
+      h('td', [...raisedBy].slice(0, 3).join(', '), raisedBy.size > 3 ? h('span.muted', ` +${raisedBy.size - 3}`) : null),
+      h('td', o.handlers.length ? o.handlers.map((x, i) => h('div', { title: x.label }, i ? '→ ' : '', x.kind === 'continue' ? 'On Error Continue' : 'On Error Propagate', h('span.muted', ` in ${x.where}`)))
+        : [h('span.check-dot.error'), 'nothing catches it']),
+      h('td', answer(o, entry))))));
+}
+
+// ------------------------------------------------------------------ what it calls
+
+function callsTab(ctx) {
+  const list = outboundCalls(ctx.project);
+  if (!list.length) return { el: h('p.muted', 'This app calls no other system through a connector configuration.') };
+  return {
+    summary: plural(list.length, 'configuration'),
+    el: list.map((c) => h('section.search-file',
+      h('div.search-file-head', c.label, h('span.muted', ` ${c.connector}`)),
+      c.settings.length ? h('div.call-settings', c.settings.map((x) => h('span', h('span.muted', `${x.name} `), h('span.mono', { title: x.raw }, resolved(x.raw, ctx))))) : null,
+      c.uses.length ? c.uses.map((u) => h('div.search-hit.call-use', { onclick: () => ctx.openItem(u.processor, u.flow) },
+        h('span.mono', { title: u.what }, resolved(u.what, ctx) || u.label), h('span.muted', `${u.label} · ${u.flow.name}`)))
+        : h('p.muted.call-none', 'Nothing uses it.'))),
+  };
+}
+
+// ------------------------------------------------------------------ properties across environments
+
+function propertiesTab(ctx) {
+  const m = envMatrix(ctx.project, { libraryTexts: ctx.libraryTexts });
+  if (!m.rows.length) return { el: h('p.muted', 'This app has no properties.') };
+  const fix = m.rows.filter((r) => r.problems.some((p) => p.severity !== 'info'));
+  const table = h('table.trace-vars.env-matrix');
+  const draw = (only) => {
+    const rows = only ? fix : m.rows;
+    table.replaceChildren(
+      h('thead', h('tr', h('th', ''), m.columns.map((c) => h('th', c || 'Value')))),
+      h('tbody', rows.map((r) => h('tr',
+        h('td.mono.key', r.key, r.problems.map((p) => h('div.problem', h(`span.check-dot.${p.severity}`), p.text))),
+        r.cells.map((c) => {
+          if (!c) return h('td.missing', '—');
+          const text = c.encrypted ? h('span.chip', 'encrypted') : c.plain ? h('span.chip.warn', 'plain text') : c.value || h('span.muted', '(empty)');
+          return h(`td.mono${c.own ? '' : '.common'}`, { title: `${c.file}:${c.line}${c.own ? '' : ' (shared by the environments)'}`, onclick: () => ctx.openSource(c.file, c.line) }, text);
+        })))));
+  };
+  const only = h('input', { type: 'checkbox', onchange: () => draw(only.checked) });
+  draw(false);
+  const missing = m.rows.filter((r) => r.problems.some((p) => p.text.startsWith('missing'))).length;
+  const undefinedKeys = m.rows.filter((r) => r.problems.some((p) => p.severity === 'error')).length;
+  return {
+    summary: [plural(m.rows.length, 'key'), missing ? `${missing} missing in some environments` : null, undefinedKeys ? `${undefinedKeys} not defined` : null].filter(Boolean).join(' · '),
+    el: [fix.length ? h('label.matrix-filter', only, ` Only the ${plural(fix.length, 'key')} to fix`) : null, h('div.matrix-wrap', table)],
+  };
+}
+
+// ------------------------------------------------------------------ library versions across the owner's apps
+
+function librariesTab(ctx) {
+  const el = h('div', h('p.muted', 'Reading every repository’s pom.xml…'));
+  ctx.libraryMap().then((libs) => {
+    if (!libs.length) return el.replaceChildren(h('p.muted', 'No app here depends on a library from another of these repositories.'));
+    // the libraries this app uses first
+    const mine = (l) => l.apps.some((a) => a.name.toLowerCase() === (ctx.repoName || '').toLowerCase());
+    const sorted = [...libs].sort((a, b) => mine(b) - mine(a));
+    el.replaceChildren(...sorted.map((l) => {
+      const old = l.apps.filter((a) => l.newest && /^\d/.test(a.version) && compareVersions(a.version, l.newest) < 0).length;
+      return h('section.search-file',
+        h('div.search-file-head', h('a', { href: l.url, target: '_blank', rel: 'noopener' }, l.artifactId),
+          h('span.muted', ` ${plural(l.apps.length, 'app')}${l.newest ? ` · newest in use ${l.newest}` : ''}${old ? ` · ${old} on older versions` : ''}`)),
+        h('div.lib-apps', l.apps.map((a) => {
+          const behind = l.newest && /^\d/.test(a.version) && compareVersions(a.version, l.newest) < 0;
+          const here = a.name.toLowerCase() === (ctx.repoName || '').toLowerCase();
+          return h(`div.lib-app${here ? '.here' : ''}`,
+            h('a', { href: a.url, target: '_blank', rel: 'noopener' }, a.name),
+            h(`span.chip${behind ? '.behind' : ''}`, { title: behind ? `Older than ${l.newest}` : a.version ? '' : 'Set in a parent pom this view cannot read' }, a.version || '?'),
+            a.branch ? h('span.muted', ` ${a.branch}`) : null);
+        })));
+    }));
+  }, (e) => el.replaceChildren(h('p.muted', `Could not read them: ${e.message}`)));
+  return { el };
+}

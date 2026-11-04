@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mule Flow Viewer · Setup</title>
+  <script src="viewer/theme.js"></script>
+  <link rel="stylesheet" href="viewer/styles.css">
+  <link rel="stylesheet" href="setup.css">
+</head>
+<body class="setup">
+  <main class="setup-main">
+    <header class="setup-head"><img src="icons/icon48.png" alt=""><h1>Mule Flow Viewer</h1><span class="spacer"></span><a id="open-guide">Setup guide</a></header>
+    <section id="problem" class="setup-card problem" hidden></section>
+    <section class="setup-card">
+      <h2>Local helper <span class="optional">optional</span></h2>
+      <p class="muted">Runs DataWeave scripts, and opens repositories on self-hosted servers from your clones. Azure DevOps, GitHub, GitLab and Bitbucket need nothing installed.</p>
+      <div id="helper" class="muted">Checking…</div>
+      <div id="install" hidden>
+        <ol>
+          <li>Install <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">Python 3.8+</a> and
+            <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git</a>.
+            The <a href="https://github.com/mulesoft/data-weave-cli" target="_blank" rel="noopener">DataWeave CLI</a> is optional (running scripts).</li>
+          <li>In the <span class="mono">helper</span> folder that came with the extension, run
+            <pre class="code"><code id="install-cmd">python3 install.py</code></pre>
+            (on Windows: <span class="mono">py install.py</span>).</li>
+          <li><a id="recheck">Check again</a></li>
+        </ol>
+      </div>
+    </section>
+    <section id="tokens" class="setup-card" hidden>
+      <h2>GitHub token</h2>
+      <div class="setup-actions"><span class="muted">Saved in this browser, sent only to api.github.com.</span><button id="forget-token">Remove</button></div>
+    </section>
+    <section class="setup-card">
+      <h2>Where your clones are</h2>
+      <p class="muted">One folder per line. The helper looks for the page's repository in these (and their subfolders); empty means your home folder.</p>
+      <textarea id="roots" class="mono" rows="4" spellcheck="false" placeholder="~/repos"></textarea>
+      <div class="setup-actions"><button id="save" class="run-button">Save</button><span id="saved" class="muted"></span></div>
+    </section>
+  </main>
+  <div id="guide" class="guide-backdrop" hidden>
+    <div class="guide" role="dialog" aria-labelledby="guide-title">
+      <header class="guide-head">
+        <img src="icons/icon48.png" alt="">
+        <div><h2 id="guide-title">Mule Flow Viewer</h2><div class="muted">Nothing to install.</div></div>
+      </header>
+      <ol class="guide-steps">
+        <li class="done">
+          <h3>Open a Mule project on Azure DevOps, GitHub, GitLab or Bitbucket</h3>
+          <p class="muted">A file, a branch or a pull request, then click the extension's button or press <span class="kbd">Alt+Shift+M</span>. It reads the repository with the sign-in this browser already has (GitHub asks once for a read-only token). Pin the button from the puzzle-piece menu to keep it at hand.</p>
+        </li>
+      </ol>
+      <h3 class="guide-section">Optional: the local helper</h3>
+      <p class="muted">For running DataWeave scripts and MUnit test inputs, and for self-hosted servers (GitHub Enterprise, your own GitLab or Bitbucket), which it opens from your clones. Each step ticks itself off.</p>
+      <ol class="guide-steps">
+        <li data-check="python">
+          <h3>Python 3.8+ and git <span class="check" data-for="python"></span></h3>
+          <p class="muted">The helper is a small Python program; git reads the history of your clones.</p>
+          <div class="os-cmd" data-os="mac"><pre class="code"><code>brew install python git</code></pre></div>
+          <div class="os-cmd" data-os="win"><pre class="code"><code>winget install Python.Python.3.12 Git.Git</code></pre></div>
+          <div class="os-cmd" data-os="linux"><pre class="code"><code>sudo apt install python3 git</code></pre></div>
+          <p class="muted os-note" data-os="mac">No Homebrew? <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> has an installer; git comes with <span class="mono">xcode-select --install</span>.</p>
+        </li>
+        <li data-check="helper">
+          <h3>Register the helper <span class="check" data-for="helper"></span></h3>
+          <p class="muted">In the folder you unzipped (the one with <span class="mono">extension</span> and <span class="mono">helper</span> in it), run:</p>
+          <div class="os-cmd" data-os="mac linux"><pre class="code"><code>python3 helper/install.py</code></pre></div>
+          <div class="os-cmd" data-os="win"><pre class="code"><code>py helper\install.py</code></pre></div>
+          <p class="muted">For your user only, no admin rights. Moved the folder later? Run it again.</p>
+        </li>
+        <li data-check="dw">
+          <h3>DataWeave CLI <span class="check" data-for="dw"></span></h3>
+          <p class="muted">The engine the helper runs scripts, MUnit test inputs and output comparisons with.</p>
+          <div class="os-cmd" data-os="mac"><pre class="code"><code>brew install mulesoft/data-weave/dw</code></pre></div>
+          <p class="muted os-note" data-os="win linux">Download it from <a href="https://github.com/mulesoft/data-weave-cli/releases" target="_blank" rel="noopener">github.com/mulesoft/data-weave-cli</a> and put <span class="mono">dw</span> on your PATH, then run <span class="mono">install.py</span> again so the helper sees it.</p>
+        </li>
+        <li>
+          <h3>Where your clones are</h3>
+          <p class="muted">For other code hosts: the helper finds the page's repository among your clones. Leave it empty to search your home folder.</p>
+          <textarea id="guide-roots" class="mono" rows="2" spellcheck="false" placeholder="~/repos"></textarea>
+        </li>
+      </ol>
+      <footer class="guide-foot"><span id="guide-status" class="muted"></span><span class="spacer"></span><button id="guide-done" class="run-button">Done</button></footer>
+    </div>
+  </div>
+  <script type="module" src="setup.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo circular -->
+  <circle cx="75" cy="75" r="70" fill="#0075C9" stroke="#005A9E" stroke-width="3"/>
+  
+  <!-- Texto "JDE" centrado vertical y horizontalmente -->
+  <text x="75" y="82" text-anchor="middle" font-size="36" fill="white" font-family="Arial, sans-serif" dominant-baseline="middle">JDE</text>
+</svg>

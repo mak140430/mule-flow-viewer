@@ -1,0 +1,14 @@
+# Built extension and helper (python3 tools/build_extension.py)
+dist/
+
+# Connector jars cache (python3 tools/fetch_connectors.py)
+generated/
+
+# The extension's signing key (the manifest carries only the public half)
+keys/extension-key.pem
+
+# Local editor and run settings
+.claude/
+.DS_Store
+__pycache__/
+node_modules/

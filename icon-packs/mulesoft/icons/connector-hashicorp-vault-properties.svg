@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="HashiCorp Vault properties provider">
+  <rect width="128" height="128" rx="24" fill="#1b1f24"/>
+  <path d="M30 38h68v52H30z" fill="#e8eef4"/>
+  <path d="M42 38v18h44V38M42 90V72h44v18" fill="none" stroke="#1b1f24" stroke-width="8"/>
+  <circle cx="64" cy="64" r="12" fill="#5c4ee5"/>
+</svg>

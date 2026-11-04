@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 67 67" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.41421;">
+    <g id="Layer-1" serif:id="Layer 1" transform="matrix(4.16667,0,0,4.16667,0,0)">
+        <text x="5.292px" y="8.802px" style="font-family:'Ubuntu-Bold', 'Ubuntu', sans-serif;font-weight:700;font-size:2.894px;fill:rgb(80,82,82);">JDE</text>
+        <g transform="matrix(1,0,0,1,15.9825,8.0011)">
+            <path d="M0,-0.002L-2.727,-4.912C-2.752,-4.956 -2.798,-4.983 -2.849,-4.983L-4.797,-4.983C-4.846,-4.983 -4.892,-4.957 -4.917,-4.914C-4.942,-4.872 -4.942,-4.819 -4.918,-4.776L-2.172,0.064L-4.917,4.772C-4.942,4.815 -4.942,4.868 -4.917,4.911C-4.893,4.954 -4.847,4.981 -4.797,4.981L-2.918,4.981C-2.869,4.981 -2.823,4.955 -2.798,4.912L-0.002,0.136C0.023,0.093 0.024,0.041 0,-0.002" style="fill:rgb(80,82,82);fill-rule:nonzero;"/>
+        </g>
+        <g transform="matrix(1,0,0,1,2.1899,7.9346)">
+            <path d="M0,0.131L2.745,-4.709C2.77,-4.752 2.77,-4.805 2.745,-4.848C2.72,-4.89 2.674,-4.917 2.625,-4.917L0.676,-4.917C0.626,-4.917 0.579,-4.889 0.555,-4.845L-2.172,0.065C-2.196,0.108 -2.196,0.16 -2.171,0.202L0.626,4.979C0.651,5.021 0.696,5.048 0.746,5.048L2.625,5.048C2.674,5.048 2.72,5.021 2.745,4.978C2.77,4.935 2.77,4.882 2.745,4.839L0,0.131Z" style="fill:rgb(80,82,82);fill-rule:nonzero;"/>
+        </g>
+    </g>
+</svg>
