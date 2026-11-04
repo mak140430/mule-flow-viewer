@@ -17,7 +17,10 @@ import subprocess
 import sys
 
 NAME = "mule_flow_viewer.helper"
-EXTENSION_IDS = ["gikmgdbiaplaeechloibkkgajcbbikom"]   # the key in the extension's manifest.json fixes this id
+EXTENSION_IDS = [
+    "gikmgdbiaplaeechloibkkgajcbbikom",   # unpacked builds: the key in the extension's manifest.json fixes this id
+    "okhagghkkpjibcneflnlcmogabfkhbcm",   # the Chrome Web Store
+]
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(os.path.expanduser("~"), ".mule-flow-viewer")
 
