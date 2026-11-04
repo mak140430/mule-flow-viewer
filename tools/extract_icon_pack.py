@@ -7,7 +7,7 @@ Sources (all optional, whatever is found is used):
   * generated/remote-jars  -> every published connector, made by tools/fetch_connectors.py
 
 Outputs:
-  icon-packs/mulesoft/manifest.json + icons/
+  icon-packs/mulesoft/pack.json + icons/
   catalog/connectors.json
 
 Usage:
@@ -371,7 +371,7 @@ def main():
         "icons": dict(sorted(icons.items())),
         "fallback": "icons/generic.png" if os.path.exists(os.path.join(PACK_DIR, "icons", "generic.png")) else None,
     }
-    with open(os.path.join(PACK_DIR, "manifest.json"), "w") as f:
+    with open(os.path.join(PACK_DIR, "pack.json"), "w") as f:
         json.dump(manifest, f, indent=2)
     with open(CATALOG, "w") as f:
         json.dump({"connectors": dict(sorted(connectors.items()))}, f, indent=2)

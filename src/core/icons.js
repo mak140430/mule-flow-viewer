@@ -74,7 +74,7 @@ export class Icons {
   /** Load a file pack; silently skipped when it does not exist (e.g. never extracted). */
   async loadPack(id, baseUrl) {
     try {
-      const res = await fetch(new URL('manifest.json', baseUrl));
+      const res = await fetch(new URL('pack.json', baseUrl));
       if (!res.ok) return false;
       const manifest = await res.json();
       this.packs.set(id, { name: manifest.name, base: baseUrl, manifest });
