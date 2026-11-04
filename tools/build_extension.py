@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,6 +50,28 @@ def zip_dir(folder, archive, prefix=""):
                 z.write(full, os.path.join(prefix, os.path.relpath(full, folder)))
 
 
+def store_checks(staged, manifest):
+    """The Web Store's upload checks, run here so a bad package fails the build instead of the upload."""
+    problems = []
+    for field, limit in (("name", 75), ("short_name", 12), ("description", 132)):
+        if len(manifest.get(field) or "") > limit:
+            problems.append(f"manifest {field} is {len(manifest[field])} characters (the store allows {limit})")
+    if not re.fullmatch(r"\d+(\.\d+){0,3}", manifest.get("version", "")):
+        problems.append(f"manifest version {manifest.get('version')!r} is not 1 to 4 dot-separated numbers")
+    if not os.path.isfile(os.path.join(staged, (manifest.get("icons") or {}).get("128", ""))):
+        problems.append("no 128x128 icon")
+    for dirpath, dirs, files in os.walk(staged):
+        rel = os.path.relpath(dirpath, staged)
+        for name in files + dirs:
+            path = os.path.normpath(os.path.join(rel, name))
+            if name == "manifest.json" and path != "manifest.json":
+                problems.append(f"a second manifest.json: {path}")
+            if name.startswith("_") and not (rel == "." and name == "_locales"):
+                problems.append(f"a name starting with _ (reserved): {path}")
+    if problems:
+        sys.exit("The Chrome Web Store would reject the package:\n  " + "\n  ".join(problems))
+
+
 def store(ext, helper, version, helper_url):
     """The Web Store package: no "key" (the store assigns the id), fonts from the system (no request to Google)."""
     out = os.path.join(ROOT, "dist", "store")
@@ -69,6 +92,7 @@ def store(ext, helper, version, helper_url):
         setup = os.path.join(staged, "setup.js")
         text = open(setup, encoding="utf-8").read().replace("const HELPER_DOWNLOAD = '';", f"const HELPER_DOWNLOAD = {json.dumps(helper_url)};")
         open(setup, "w", encoding="utf-8").write(text)
+    store_checks(staged, manifest)
     zip_dir(staged, os.path.join(out, f"mule-flow-viewer-{version}-chrome-web-store.zip"))
     zip_dir(helper, os.path.join(out, f"mule-flow-viewer-helper-{version}.zip"), "mule-flow-viewer-helper")
     shutil.rmtree(staged)
