@@ -27,3 +27,9 @@
 - A secret-looking key with a plain value counts as plain text in a secure properties file too.
 - tools/store_screenshots.mjs needs the demo repository's remote on a host the viewer does not read itself
   (git.acme.example), so it goes through the helper; its node process does not exit on its own after the last shot.
+
+- Chrome for Testing reads the macOS keychain ("Chrome Safe Storage") at startup: with the login keychain locked it
+  hangs silently and pops keychain prompts at the user. Every test launch passes `--use-mock-keychain
+  --password-store=basic` (store_screenshots.mjs, e2e_chrome.mjs); keep it on any new launcher.
+- Image export (Copy image / PNG / SVG) uses the flow's card on the canvas, else draws the flow just for the image:
+  never return silently when the card isn't there.

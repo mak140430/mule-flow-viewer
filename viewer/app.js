@@ -1185,8 +1185,9 @@ function renderOverviewRoute(s) {
 
 /** A flow of the canvas as an image: copied to the clipboard, or saved as a PNG or an SVG. */
 async function exportFlow(flow, format, button) {
-  const card = [...document.querySelectorAll('#main section.flow')].find((el) => el.dataset.flow === flow.name);
-  if (!card) return;
+  // as drawn on the canvas; a flow not drawn there is drawn for the image alone
+  const card = [...document.querySelectorAll('#main section.flow')].find((el) => el.dataset.flow === flow.name)
+    || renderConfig({ flows: [flow], globals: [] }, canvasCtx()).querySelector('section.flow');
   const label = button.textContent;
   const done = (text) => { button.textContent = text; setTimeout(() => { button.textContent = label; }, 1600); };
   const name = flow.name.replace(/[\\/:*?"<>|]+/g, '-');
@@ -1194,8 +1195,10 @@ async function exportFlow(flow, format, button) {
     if (format === 'svg') {
       const { svg } = await elementSvg(card);
       saveBlob(new Blob([svg], { type: 'image/svg+xml' }), `${name}.svg`);
+      done('Saved');
     } else if (format === 'png') {
       saveBlob(await elementPng(card), `${name}.png`);
+      done('Saved');
     } else {
       // the clipboard takes a promise, so the click still counts as the user's when the image is ready
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': elementPng(card) })]);

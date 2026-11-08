@@ -27,7 +27,7 @@ writeFileSync(join(profile, 'NativeMessagingHosts', 'mule_flow_viewer.helper.jso
 }));
 
 const chrome = spawn(chromeBin, [`--user-data-dir=${profile}`, '--remote-debugging-pipe', '--enable-unsafe-extension-debugging',
-  '--no-first-run', '--no-default-browser-check', '--window-size=1400,1000', '--hide-scrollbars', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
+  '--use-mock-keychain', '--password-store=basic', '--no-first-run', '--no-default-browser-check', '--window-size=1400,1000', '--hide-scrollbars', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
 let buf = '';
 let seq = 0;
 const waiting = new Map();
