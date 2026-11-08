@@ -1,4 +1,4 @@
-// Setup: is the helper there, what went wrong with the last page, and where to look for clones.
+// Setup: is the helper there, and what went wrong with the last page.
 
 import { ask, openPage, DEFAULTS } from './open.js';
 
@@ -38,8 +38,18 @@ async function showProblem() {
   const page = Object.assign(document.createElement('p'), { className: 'muted mono setup-url', textContent: data.link || '' });
   box.replaceChildren(Object.assign(document.createElement('h2'), { textContent: 'This page could not be opened' }), page, p(r.message || r.error));
   if (r.error === 'no-helper') return;       // the install steps below say what to do
-  // a clone of your own in a folder not searched is used before the helper's copy
-  if (r.error === 'no-remote' && r.roots?.length) box.append(p(`If you have a clone, add its folder below (looked in ${r.roots.join(', ')}).`));
+  // git can't download it: a clone of your own is the way in. Your home folder is searched unless folders are set here.
+  if (r.error === 'no-remote') {
+    const { roots } = await chrome.storage.sync.get(DEFAULTS);
+    const folders = Object.assign(document.createElement('textarea'), { className: 'mono', rows: 2, spellcheck: false, placeholder: '~', value: roots.join('\n') });
+    const label = Object.assign(document.createElement('label'), { textContent: 'Folders with your clones, one per line' });
+    label.append(folders);
+    box.append(label);
+    retry.onclick = async () => {
+      await chrome.storage.sync.set({ roots: lines(folders.value) });
+      openPage(data, await here());
+    };
+  }
   box.append(document.createElement('br'), retry);
 }
 
@@ -50,13 +60,6 @@ async function settings() {
     delete tokens['github.com'];
     await chrome.storage.local.set({ tokens });
     $('tokens').hidden = true;
-  };
-  const s = await chrome.storage.sync.get(DEFAULTS);
-  $('roots').value = s.roots.join('\n');
-  $('save').onclick = async () => {
-    await chrome.storage.sync.set({ roots: lines($('roots').value) });
-    $('saved').textContent = 'Saved';
-    setTimeout(() => { $('saved').textContent = ''; }, 1500);
   };
 }
 
@@ -81,8 +84,6 @@ async function guide() {
     copy.onclick = async () => { await navigator.clipboard.writeText(pre.innerText.replace(/Copy$/, '').trim()); copy.textContent = 'Copied'; setTimeout(() => { copy.textContent = 'Copy'; }, 1400); };
     pre.append(copy);
   });
-  const { roots } = await chrome.storage.sync.get(DEFAULTS);
-  $('guide-roots').value = roots.join('\n');
   const mark = (name, state, text) => {
     const el = box.querySelector(`.check[data-for="${name}"]`);
     el.className = `check ${state}`;
@@ -108,7 +109,6 @@ async function guide() {
   };
   poll();
   $('guide-done').onclick = async () => {
-    await chrome.storage.sync.set({ roots: lines($('guide-roots').value) });
     await chrome.storage.local.set({ guideSeen: 1 });
     box.hidden = true;
     history.replaceState(null, '', location.pathname);

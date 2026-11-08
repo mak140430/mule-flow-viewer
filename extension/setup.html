@@ -32,12 +32,6 @@
       <h2>GitHub token</h2>
       <div class="setup-actions"><span class="muted">Saved in this browser, sent only to api.github.com.</span><button id="forget-token">Remove</button></div>
     </section>
-    <section class="setup-card">
-      <h2>Where your clones are</h2>
-      <p class="muted">One folder per line. The helper looks for the page's repository in these (and their subfolders); empty means your home folder.</p>
-      <textarea id="roots" class="mono" rows="4" spellcheck="false" placeholder="~/repos"></textarea>
-      <div class="setup-actions"><button id="save" class="run-button">Save</button><span id="saved" class="muted"></span></div>
-    </section>
   </main>
   <div id="guide" class="guide-backdrop" hidden>
     <div class="guide" role="dialog" aria-labelledby="guide-title">
@@ -74,11 +68,6 @@
           <p class="muted">The engine the helper runs scripts, MUnit test inputs and output comparisons with.</p>
           <div class="os-cmd" data-os="mac"><pre class="code"><code>brew install mulesoft/data-weave/dw</code></pre></div>
           <p class="muted os-note" data-os="win linux">Download it from <a href="https://github.com/mulesoft/data-weave-cli/releases" target="_blank" rel="noopener">github.com/mulesoft/data-weave-cli</a> and put <span class="mono">dw</span> on your PATH, then run <span class="mono">install.py</span> again so the helper sees it.</p>
-        </li>
-        <li>
-          <h3>Where your clones are</h3>
-          <p class="muted">For other code hosts: the helper finds the page's repository among your clones. Leave it empty to search your home folder.</p>
-          <textarea id="guide-roots" class="mono" rows="2" spellcheck="false" placeholder="~/repos"></textarea>
         </li>
       </ol>
       <footer class="guide-foot"><span id="guide-status" class="muted"></span><span class="spacer"></span><button id="guide-done" class="run-button">Done</button></footer>
