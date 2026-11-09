@@ -27,11 +27,15 @@ const save = (state) => {
 };
 const newId = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-/** A new playground from a script and inputs (the "Open in playground" of a Run block); it becomes the active one. */
-export function addPlayground({ name, script, inputs }) {
+/**
+ * A new playground from a script and inputs (the "Open in playground" of a Run block); it becomes the active one.
+ * versions: [{label, script}] of a changed script (Before, After), switched between on the same inputs; version: the one shown.
+ */
+export function addPlayground({ name, script, inputs, versions = null, version = 0 }) {
   const state = load();
   const id = newId();
-  state.items.push({ id, name: name || `Playground ${state.items.length + 1}`, script, inputs: inputs?.length ? inputs : structuredClone(STARTER.inputs) });
+  state.items.push({ id, name: name || `Playground ${state.items.length + 1}`, script, inputs: inputs?.length ? inputs : structuredClone(STARTER.inputs),
+    ...(versions?.length > 1 ? { versions, version } : {}) });
   state.active = id;
   save(state);
 }
@@ -172,7 +176,28 @@ export function renderPlaygroundView(ctx) {
     }
   }
   script.onkeydown = keys;
-  script.oninput = () => { pg.script = script.value; schedule(); };
+  script.oninput = () => {
+    pg.script = script.value;
+    if (pg.versions) pg.versions[pg.version].script = script.value;   // each version keeps its own edits
+    schedule();
+  };
+
+  // a changed script's versions: the same inputs, one script or the other
+  const versionSwitch = h('div.seg.play-versions');
+  function renderVersions() {
+    versionSwitch.hidden = !pg.versions;
+    versionSwitch.replaceChildren(...(pg.versions || []).map((v, i) => h(`button${i === pg.version ? '.active' : ''}`, {
+      title: `Run the ${v.label.toLowerCase()} version on these inputs`,
+      onclick: () => {
+        if (i === pg.version) return;
+        pg.version = i;
+        pg.script = script.value = v.script;
+        renderVersions();
+        persist();
+        run();
+      },
+    }, v.label)));
+  }
 
   // ---------------------------------------------------------------- playgrounds
 
@@ -190,6 +215,7 @@ export function renderPlaygroundView(ctx) {
     files.clear();
     title.value = p.name;
     script.value = p.script;
+    renderVersions();
     renderPicker();
     renderInputs();
     output.replaceChildren(h('p.muted', ctx.engine ? 'Running…' : ''));
@@ -219,17 +245,64 @@ export function renderPlaygroundView(ctx) {
       h('button.run-button', { title: '⌘↵', onclick: () => run() }, 'Run'),
       status),
     ctx.engine ? null : h('p.notice', 'The DataWeave CLI is not installed, so scripts cannot run here. See the setup guide.'),
-    h('div.play-grid',
-      h('section.play-col',
-        h('div.play-col-head', h('h3', 'Inputs'), h('span.spacer'), h('a', { onclick: addVar }, '+ Variable'), h('a', { onclick: addAttributes }, '+ Attributes')),
-        inputsList),
-      h('section.play-col',
-        h('div.play-col-head', h('h3', 'Script')),
-        script),
-      h('section.play-col',
-        h('div.play-col-head', h('h3', 'Output')),
-        output)),
+    resizable(h('section.play-col',
+      h('div.play-col-head', h('h3', 'Inputs'), h('span.spacer'), h('a', { onclick: addVar }, '+ Variable'), h('a', { onclick: addAttributes }, '+ Attributes')),
+      inputsList),
+    h('section.play-col',
+      h('div.play-col-head', h('h3', 'Script'), h('span.spacer'), versionSwitch),
+      script),
+    h('section.play-col',
+      h('div.play-col-head', h('h3', 'Output')),
+      output)),
   ].filter(Boolean));
   open(pg);
   return root;
+}
+
+// ------------------------------------------------------------------ column widths
+
+const COLS = 'mfv.playCols';
+const DEFAULT_COLS = [1, 1.25, 1];
+const MIN_COL = 220;   // px
+
+/**
+ * The three columns side by side, with a handle between each two: drag to share the width differently, double-click
+ * to go back to the default. The shares are kept for the next playground.
+ */
+function resizable(...cols) {
+  let shares = DEFAULT_COLS;
+  try { const v = JSON.parse(localStorage.getItem(COLS)); if (Array.isArray(v) && v.length === 3 && v.every((n) => n > 0)) shares = v; } catch { /* unavailable */ }
+  const grid = h('div.play-grid');
+  const apply = () => { grid.style.gridTemplateColumns = shares.map((f) => `minmax(0, ${f}fr)`).join(' var(--play-gap) '); };
+  const keep = () => { try { localStorage.setItem(COLS, JSON.stringify(shares)); } catch { /* unavailable */ } };
+  const handle = (i) => h('div.play-handle', {
+    title: 'Drag to resize · double-click to reset',
+    ondblclick: () => { shares = DEFAULT_COLS; apply(); keep(); },
+    onpointerdown: (e) => {
+      e.preventDefault();
+      const el = e.currentTarget;
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('dragging');
+      // the columns' widths now, in pixels; the two beside the handle trade width
+      const widths = cols.map((c) => c.getBoundingClientRect().width);
+      const pair = widths[i] + widths[i + 1];
+      const x0 = e.clientX;
+      const move = (ev) => {
+        const left = Math.max(MIN_COL, Math.min(pair - MIN_COL, widths[i] + ev.clientX - x0));
+        const w = [...widths];
+        w[i] = left;
+        w[i + 1] = pair - left;
+        const total = w.reduce((a, b) => a + b, 0);
+        shares = w.map((x) => +(x / total * 3).toFixed(3));
+        apply();
+      };
+      const up = () => { el.classList.remove('dragging'); el.removeEventListener('pointermove', move); keep(); };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up, { once: true });
+      el.addEventListener('pointercancel', up, { once: true });
+    },
+  });
+  grid.append(cols[0], handle(0), cols[1], handle(1), cols[2]);
+  apply();
+  return grid;
 }

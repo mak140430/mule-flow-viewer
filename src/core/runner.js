@@ -64,12 +64,67 @@ export const formatSize = (n) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 10
  * Collapsed "Run" block; built when first opened.
  * sites: [{processor, flow}] that run the script; MUnit tests reaching them offer input samples.
  */
-export function renderRunner(code, key, ctx, sites = []) {
-  const el = h('details.runner', h('summary', 'Run'));
+export function renderRunner(code, key, ctx, sites = [], { before = null } = {}) {
+  let body = null;
+  // a changed script: both versions go, on the same inputs (those either one reads), to switch between
+  const withBefore = (data) => {
+    if (before == null || before === code) return data;
+    const have = new Set(data.inputs.map((i) => i.name));
+    const inputs = [...data.inputs, ...inputsOf(before).filter((i) => !have.has(i.name)).map(({ name, mime, text }) => ({ name, mime, text }))];
+    return { ...data, inputs, versions: [{ label: 'Before', script: before }, { label: 'After', script: data.script }], version: 1 };
+  };
+  // the script and its inputs in a playground, without opening the block: what Run would start from
+  const toPlay = ctx.openPlayground ? h('a.run-to-play', { title: 'The script, its variables and its inputs (yours, or a MUnit test\'s) in a new playground' }, 'Open in playground') : null;
+  const name = [sites[0]?.processor?.label, key.split(':').pop()].filter(Boolean).join(' · ');
+  if (toPlay) {
+    toPlay.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (body) return ctx.openPlayground({ name, ...withBefore(body.current()) });
+      toPlay.textContent = 'Running the test…';
+      try {
+        ctx.openPlayground({ name, ...withBefore(await startingInputs(code, key, ctx, sites)) });
+      } finally { toPlay.textContent = 'Open in playground'; }
+    };
+  }
+  const el = h('details.runner', h('summary', h('span', 'Run'), toPlay));
   el.addEventListener('toggle', () => {
-    if (el.open && el.children.length === 1) el.append(runnerBody(code, key, ctx, sites));
+    if (el.open && !body) { body = runnerBody(code, key, ctx, sites); el.append(body); }
   });
   return el;
+}
+
+/** What a Run block opens with: the inputs you gave it last, else the first MUnit test's event, else an outline of what the script reads. */
+async function startingInputs(code, key, ctx, sites) {
+  const saved = store.get(key) || {};
+  const script = saved['#script']?.text ?? code;
+  const yours = Object.keys(saved).some((n) => n !== '#script');
+  const samples = !yours && sites.length ? testSamples(ctx.project, sites) : [];
+  if (samples.length) {
+    const filled = await sampleInputs(samples[0], code, ctx).catch(() => null);
+    if (filled) return { script, inputs: filled.inputs };
+  }
+  const extra = Object.keys(saved).filter((n) => n.startsWith('vars.')).map((n) => ({ name: n }));
+  return { script, inputs: [...inputsOf(script), ...extra].map((i) => ({ name: i.name, mime: saved[i.name]?.mime ?? i.mime ?? JSON_MIME, text: saved[i.name]?.text ?? i.text ?? '' })) };
+}
+
+/** A MUnit test's event at the script, as the script's inputs: [{name, mime, text}], with the run's result. */
+async function sampleInputs(sample, code, ctx, onStep) {
+  const r = await runSample(sample, { project: ctx.project, engine: ctx.engine, properties: propertiesOf(ctx.project, ctx.env) }, onStep);
+  const base = inputsOf(code);
+  const keys = base.find((i) => i.name === 'vars')?.keys || [];
+  // variables the script reads first; the rest of the event follows
+  const vars = [...r.vars].sort(([a], [b]) => keys.includes(b) - keys.includes(a));
+  const filled = {
+    payload: r.payload,
+    attributes: r.attributes,
+    vars: { text: jsonObject(vars.filter(([, v]) => v.mime === JSON_MIME), keys.filter((k) => !r.vars.has(k))), mime: JSON_MIME },
+  };
+  const inputs = [
+    ...base.map((i) => ({ name: i.name, mime: i.mime, text: i.text, ...(filled[i.name] || {}) })),
+    ...(base.some((i) => i.name === 'vars') ? vars.filter(([, v]) => v.mime !== JSON_MIME) : []).map(([k, v]) => ({ name: `vars.${k}`, ...v })),
+  ];
+  return { inputs: inputs.map(({ name, mime, text }) => ({ name, mime, text })), r };
 }
 
 export const PLAYGROUND_SCRIPT = '%dw 2.0\noutput application/json\n---\npayload';
@@ -204,22 +259,10 @@ function runnerBody(code, key, ctx, sites, opts = {}) {
     status.textContent = 'Running the test…';
     try {
       if (!results.has(sample)) {
-        results.set(sample, await runSample(sample, { project: ctx.project, engine: ctx.engine, properties: propertiesOf(ctx.project, ctx.env) },
-          (n) => { status.textContent = `Running the test… step ${n}`; }));
+        results.set(sample, await sampleInputs(sample, code, ctx, (n) => { status.textContent = `Running the test… step ${n}`; }));
       }
-      const r = results.get(sample);
-      // variables the script reads first; the rest of the event follows
-      const vars = [...r.vars].sort(([a], [b]) => keys.includes(b) - keys.includes(a));
-      const filled = {
-        payload: r.payload,
-        attributes: r.attributes,
-        vars: { text: jsonObject(vars.filter(([, v]) => v.mime === JSON_MIME), keys.filter((k) => !r.vars.has(k))), mime: JSON_MIME },
-      };
-      editors = [
-        ...base.map((i) => editor({ ...i, ...(filled[i.name] || {}) })),
-        ...(base.some((i) => i.name === 'vars') ? vars.filter(([, v]) => v.mime !== JSON_MIME) : [])
-          .map(([k, v]) => editor({ name: `vars.${k}`, ...v })),
-      ];
+      const { inputs, r } = results.get(sample);
+      editors = inputs.map((i) => editor({ ...base.find((b) => b.name === i.name), ...i }));
       layout();
       schedule();
       const unknown = keys.filter((k) => !r.vars.has(k) && r.unknownVars.has(k));
@@ -304,10 +347,8 @@ function runnerBody(code, key, ctx, sites, opts = {}) {
   }
 
   if (live.checked && opts.live) setTimeout(run);
-  // the script and its inputs as they are now, in a playground of their own
-  const toPlayground = ctx.openPlayground ? h('a.run-to-play', {
-    title: 'Copy this script and its inputs into a new playground',
-    onclick: () => ctx.openPlayground({ name: key.split(':').pop(), script, inputs: editors.map(({ input }) => ({ name: input.name, mime: input.mime, text: input.text })) }),
-  }, 'Open in playground') : null;
-  return h('div.run-body', h('div.run-edit', h('div.run-head', tabs, source), sampleNote, panes, h('div.run-actions', button, liveLabel, status, h('span.spacer'), toPlayground)), output);
+  const body = h('div.run-body', h('div.run-edit', h('div.run-head', tabs, source), sampleNote, panes, h('div.run-actions', button, liveLabel, status)), output);
+  // the script and its inputs as they are now (for "Open in playground")
+  body.current = () => ({ script, inputs: editors.map(({ input }) => ({ name: input.name, mime: input.mime, text: input.text })) });
+  return body;
 }

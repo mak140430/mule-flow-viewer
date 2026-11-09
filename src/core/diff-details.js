@@ -148,7 +148,7 @@ function scriptDiffs(a, b, ctx) {
     // the newer version can be run (and edited) here too, with inputs from its MUnit tests
     const own = ctx.diff.head.byId.get(b.id);
     const run = after != null && ctx.compareEngine
-      ? renderRunner(after, `diff:${b.file}:${b.id}:${label}`, { ...ctx, project: ctx.diff.head, engine: ctx.compareEngine }, own ? [{ processor: own.item, flow: own.flow }] : [])
+      ? renderRunner(after, `diff:${b.file}:${b.id}:${label}`, { ...ctx, project: ctx.diff.head, engine: ctx.compareEngine }, own ? [{ processor: own.item, flow: own.flow }] : [], { before })
       : null;
     if (x && y && x.resource === y.resource && before === after) {
       return h('details.details-section', h('summary', h('h3.script-label', label)), link, after == null ? null : code(after), run);
