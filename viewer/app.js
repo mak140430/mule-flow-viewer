@@ -11,7 +11,7 @@ import { FileVersions } from '../src/core/element-history.js';
 import { defaultColumns, gridRows, renderGrid } from '../src/core/branch-grid.js';
 import { locate } from '../src/core/locate.js';
 import { openPalette } from '../src/core/palette.js';
-import { pickBranch } from '../src/core/branch-picker.js';
+import { pickBranch, pickCommit } from '../src/core/branch-picker.js';
 import { paintBlame, clearBlame } from '../src/core/blame.js';
 import { secureConfigs, decryptAll, guardSecrets } from '../src/core/secure.js';
 import { testSamples } from '../src/core/chain.js';
@@ -355,6 +355,13 @@ async function renderDiffBar({ rev, base, ref, file, vs, into, with: withName })
   const current = list.commits.find((c) => c.sha === rev || c.short === rev);
   if (!current && !base && rev !== WORKTREE) select.prepend(h('option', { value: rev }, rev));
   select.value = compare ? COMPARE : base ? RANGE : current?.sha || rev;
+  // the list to type into: the comparisons, then the commits with their author and date
+  const bySha = new Map(list.commits.map((c) => [c.sha, c]));
+  commitItems = [...select.options].map((o) => {
+    const c = bySha.get(o.value);
+    return c ? { value: c.sha, label: c.subject, sha: c.sha, author: c.author, date: c.date } : { value: o.value, label: o.text };
+  });
+  $('commit-pick').replaceChildren(h('span', select.selectedOptions[0]?.text || ''));
   const values = [...select.options].map((o) => o.value);
   const i = values.indexOf(select.value);
   $('newer').disabled = i <= 0;
@@ -380,7 +387,7 @@ async function renderDiffBar({ rev, base, ref, file, vs, into, with: withName })
       ? `${current.author} · ${new Date(current.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}${current.parents.length > 1 ? ' · merge, compared with first parent' : ''}`
       : rev === WORKTREE ? 'compared with HEAD' : '';
   fullTitle($('commit-meta'));
-  $('commit').title = select.selectedOptions[0]?.text || '';
+  $('commit-pick').title = select.selectedOptions[0]?.text || '';
 }
 
 /** Hovering a line cut short with "…" shows all of it. */
@@ -403,6 +410,7 @@ function firstOf(list) {
   return list.dirty ? WORKTREE : list.commits[0]?.sha;
 }
 
+let commitItems = [];     // the History bar's list, for its picker
 let replaying = null;     // interval while a replay runs
 let replaySteps = [];
 const REPLAY_MS = 2200;
@@ -1174,6 +1182,7 @@ function renderOverviewRoute(s) {
     libraryTexts: [...new Set([...(libs?.values() || [])].map((x) => x.project))].flatMap((p) => [...p.texts.values()]),
     libraryMap: adapter.libraryMap || null,
     repoName: adapter.repo || adapter.name,
+    commits: adapter.commitsOn && adapter.branches ? { branches: () => adapter.branches(), on: commitsOn } : null,
     onTab: (tab) => writeHash({ file: readHash().file, app: tab }, false),
     openFlow: (name) => navigate(name),
     openItem: (item, flow) => writeHash({ file: flow.file, flow: flow.name, sel: item.id }, true),
@@ -1181,6 +1190,15 @@ function renderOverviewRoute(s) {
   };
   $('main').replaceChildren(renderOverview(ctx));
   $('main').scrollTop = 0;
+}
+
+/** A branch's commits for the Commits overview, read once per repository. */
+const commitLists = new WeakMap();
+function commitsOn(branch) {
+  if (!commitLists.has(adapter)) commitLists.set(adapter, new Map());
+  const cache = commitLists.get(adapter);
+  if (!cache.has(branch)) cache.set(branch, adapter.commitsOn(branch).catch((e) => { cache.delete(branch); throw e; }));
+  return cache.get(branch);
 }
 
 /** A flow of the canvas as an image: copied to the clipboard, or saved as a PNG or an SVG. */
@@ -1499,7 +1517,10 @@ function setupControls() {
     const first = firstOf(list);
     if (first) openCommit(first, ref);
   };
-  $('commit').onchange = () => openCommit($('commit').value);
+  $('commit-pick').onclick = async () => {
+    const picked = await pickCommit($('commit-pick'), { items: commitItems, value: $('commit').value });
+    if (picked && picked !== $('commit').value) openCommit(picked);
+  };
   $('impact-toggle').onclick = () => {
     const s = readHash();
     writeHash(s.impact ? { file: s.file, flow: s.flow } : { file: s.file, impact: '1' }, true);

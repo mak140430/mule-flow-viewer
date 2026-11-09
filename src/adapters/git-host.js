@@ -446,6 +446,13 @@ export async function gitHostAdapter(host, { url = '', dataweave = async () => n
     return { dirty: false, head: at, mergeBase: mergeBase === at ? null : mergeBase, commits, defaultHead: tips[refs.default], ahead };
   }
 
+  /** A branch's commits to this app, newest first (300 at most): who and when, for the Commits overview. */
+  async function commitsOn(ref = '') {
+    const at = await resolve(ref);
+    const list = await rd.commits(at, app, 300);
+    return { commits: list.map((c) => ({ sha: c.sha, author: c.author, date: c.date })), capped: list.length >= 300 };
+  }
+
   async function versions(path) {
     const full = join(app, path);
     const others = order.filter((n) => n !== current);
@@ -563,6 +570,7 @@ export async function gitHostAdapter(host, { url = '', dataweave = async () => n
       read,
       branches: async () => ({ current, default: refs.default, branches: order, tags: refs.tags.map((t) => t.name), tips }),
       history,
+      commitsOn,
       versions,
       search,
       warm,

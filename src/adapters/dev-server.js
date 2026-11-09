@@ -39,6 +39,11 @@ export async function devServerAdapter(rev = '', server = {}) {
       const r = await fetch(`/api/history?${params.filter(Boolean).join('&')}`);
       return r.ok ? r.json() : { dirty: false, head: null, mergeBase: null, commits: [] };
     },
+    commitsOn: async (ref = '') => {
+      const r = await fetch(`/api/history${ref ? `?ref=${encodeURIComponent(ref)}` : ''}`);
+      const commits = r.ok ? (await r.json()).commits : [];
+      return { commits: commits.map((c) => ({ sha: c.sha, author: c.author, date: c.date })), capped: commits.length >= 300 };
+    },
     versions: async (path) => {
       const r = await fetch(`/api/versions?path=${encodeURIComponent(path)}`);
       if (!r.ok) throw new Error(`History of ${path}: ${r.status}`);

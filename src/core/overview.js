@@ -6,18 +6,20 @@ import { h } from './dom.js';
 import { entryPoints, outboundCalls, errorsOf, OTHER } from './surface.js';
 import { envMatrix } from './env-matrix.js';
 import { compareVersions } from '../adapters/git-host.js';
+import { pickBranch } from './branch-picker.js';
 
-export const TABS = [['endpoints', 'Entry points'], ['calls', 'Calls'], ['properties', 'Properties'], ['libraries', 'Libraries']];
+export const TABS = [['endpoints', 'Entry points'], ['calls', 'Calls'], ['properties', 'Properties'], ['libraries', 'Libraries'], ['commits', 'Commits']];
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * ctx: {project, env, libraryFlows, libraryTexts, libraryMap (() => Promise) | null, artifactId, tab, onTab(tab),
- * openFlow(name), openItem(item, flow), openSource(file, line)}
+ * openFlow(name), openItem(item, flow), openSource(file, line),
+ * commits: {branches: () => Promise<{current, default, branches}>, on(branch) -> Promise<{commits, capped}>} | null}
  */
 export function renderOverview(ctx) {
-  const tabs = TABS.filter(([id]) => id !== 'libraries' || ctx.libraryMap);
+  const tabs = TABS.filter(([id]) => (id !== 'libraries' || ctx.libraryMap) && (id !== 'commits' || ctx.commits));
   const tab = tabs.some(([id]) => id === ctx.tab) ? ctx.tab : 'endpoints';
-  const body = { endpoints: endpointsTab, calls: callsTab, properties: propertiesTab, libraries: librariesTab }[tab](ctx);
+  const body = { endpoints: endpointsTab, calls: callsTab, properties: propertiesTab, libraries: librariesTab, commits: commitsTab }[tab](ctx);
   return h('div.search-view.overview',
     h('div.search-head', h('div.seg.overview-tabs', tabs.map(([id, label]) => h(`button${id === tab ? '.active' : ''}`, { onclick: () => ctx.onTab(id) }, label))),
       body.summary ? h('span.muted', body.summary) : null),
@@ -168,5 +170,69 @@ function librariesTab(ctx) {
         })));
     }));
   }, (e) => el.replaceChildren(h('p.muted', `Could not read them: ${e.message}`)));
+  return { el };
+}
+
+// ------------------------------------------------------------------ commits per author and per branch
+
+const ALL = 'All branches';
+const TOP = 15;
+
+/** Bars of one measure, longest first: [{label, value, title?, onclick?}], the rest folded into one row. */
+function bars(rows, unit) {
+  const sorted = [...rows].sort((a, b) => b.value - a.value);
+  const shown = sorted.slice(0, TOP);
+  const rest = sorted.slice(TOP);
+  if (rest.length) shown.push({ label: `${rest.length} more`, value: rest.reduce((n, r) => n + r.value, 0), more: true });
+  const max = Math.max(1, ...shown.map((r) => r.value));
+  return h('div.bars', shown.map((r) => h(`div.bar-row${r.onclick ? '.link' : ''}${r.more ? '.more' : ''}`, { title: r.title || `${r.label}: ${plural(r.value, unit)}`, onclick: r.onclick || null },
+    h('span.bar-label', r.label),
+    h('span.bar-track', h('span.bar', { style: `width: ${Math.max(0.5, (r.value / max) * 100)}%` })),
+    h('span.bar-value', String(r.value)))));
+}
+
+function commitsTab(ctx) {
+  const el = h('div.commits-tab', h('p.muted', 'Reading the branches…'));
+  const show = async (scope) => {
+    const { current, default: main, branches } = await ctx.commits.branches();
+    const pick = h('button.branch-button', { title: 'Branch: type to find one' }, scope);
+    pick.onclick = async () => {
+      const b = await pickBranch(pick, { branches: [ALL, ...branches], current, value: scope, currentLabel: 'this page' });
+      if (b && b !== scope) show(b);
+    };
+    const status = h('span.muted', '');
+    const body = h('div.commits-charts');
+    el.replaceChildren(h('div.commits-head', pick, status), body);
+    // every branch when all are asked for, else the one
+    const names = scope === ALL ? [main, ...branches.filter((b) => b !== main)].filter(Boolean) : [scope];
+    const lists = new Map();
+    let read = 0;
+    await Promise.all(names.map(async (b) => {
+      lists.set(b, await ctx.commits.on(b).catch(() => ({ commits: [], capped: false, failed: true })));
+      read++;
+      if (names.length > 1 && read < names.length) status.textContent = `Reading ${read} of ${plural(names.length, 'branch', 'branches')}…`;
+    }));
+    if (pick.isConnected === false) return;   // another scope was picked meanwhile
+    const unique = new Map();
+    for (const { commits } of lists.values()) for (const c of commits) unique.set(c.sha, c);
+    const byAuthor = new Map();
+    for (const c of unique.values()) byAuthor.set(c.author || '?', (byAuthor.get(c.author || '?') || 0) + 1);
+    const capped = [...lists.values()].some((l) => l.capped);
+    const failed = [...lists].filter(([, l]) => l.failed).map(([b]) => b);
+    status.textContent = [plural(unique.size, 'commit'), plural(byAuthor.size, 'author'),
+      capped ? 'newest 300 per branch' : null, failed.length ? `could not read ${failed.join(', ')}` : null].filter(Boolean).join(' · ');
+    const charts = [h('section.commits-chart', h('h3', 'By author'), bars([...byAuthor].map(([label, value]) => ({ label, value })), 'commit'))];
+    if (scope === ALL && names.length > 1) {
+      // what each branch has that the default branch does not
+      const onMain = new Set((lists.get(main)?.commits || []).map((c) => c.sha));
+      const rows = names.filter((b) => b !== main).map((b) => ({
+        label: b, value: lists.get(b).commits.filter((c) => !onMain.has(c.sha)).length, onclick: () => show(b),
+      })).filter((r) => r.value);
+      charts.push(h('section.commits-chart', h('h3', `By branch, not on ${main}`),
+        rows.length ? bars(rows, 'commit') : h('p.muted', `Every branch's commits are on ${main}.`)));
+    }
+    body.replaceChildren(...charts);
+  };
+  ctx.commits.branches().then(() => show(ALL), (e) => el.replaceChildren(h('p.muted', `Could not read the branches: ${e.message}`)));
   return { el };
 }
