@@ -7,6 +7,7 @@ import { h } from './dom.js';
 import { highlightDataWeave } from './dataweave.js';
 import { modulesOf } from './chain.js';
 import { propertiesOf, missingModules, errorHint, formatSize, MIMES, EXT, STORE_LIMIT, HIGHLIGHT_LIMIT } from './runner.js';
+import { pickCommit } from './branch-picker.js';
 
 const KEY = 'mfv.playgrounds';
 const NAME = /^[A-Za-z_][\w-]{0,79}$/;
@@ -30,17 +31,18 @@ const newId = () => `p${Date.now().toString(36)}${Math.random().toString(36).sli
 /**
  * A new playground from a script and inputs (the "Open in playground" of a Run block); it becomes the active one.
  * versions: [{label, script}] of a changed script (Before, After), switched between on the same inputs; version: the one shown.
+ * source: where the script lives in the project (script-history.js), so its earlier versions can be picked.
  */
-export function addPlayground({ name, script, inputs, versions = null, version = 0 }) {
+export function addPlayground({ name, script, inputs, versions = null, version = 0, source = null }) {
   const state = load();
   const id = newId();
   state.items.push({ id, name: name || `Playground ${state.items.length + 1}`, script, inputs: inputs?.length ? inputs : structuredClone(STARTER.inputs),
-    ...(versions?.length > 1 ? { versions, version } : {}) });
+    ...(versions?.length > 1 ? { versions, version } : {}), ...(source ? { source } : {}) });
   state.active = id;
   save(state);
 }
 
-/** ctx: {engine, project, env} */
+/** ctx: {engine, project, env, scriptHistory(source) -> Promise<[{sha, short, subject, author, date, script}]> | null} */
 export function renderPlaygroundView(ctx) {
   const state = load();
   let pg = state.items.find((p) => p.id === state.active) || state.items[0];
@@ -187,9 +189,16 @@ export function renderPlaygroundView(ctx) {
   function renderVersions() {
     versionSwitch.hidden = !pg.versions;
     versionSwitch.replaceChildren(...(pg.versions || []).map((v, i) => h(`button${i === pg.version ? '.active' : ''}`, {
-      title: `Run the ${v.label.toLowerCase()} version on these inputs`,
+      title: v.title || `Run the ${v.label.toLowerCase()} version on these inputs`,
       onclick: () => {
         if (i === pg.version) return;
+        // a version with its own test inputs brings them; each keeps its edits
+        if (v.inputs) {
+          pg.versions[pg.version].inputs = pg.inputs;
+          pg.inputs = v.inputs;
+          files.clear();
+          renderInputs();
+        }
         pg.version = i;
         pg.script = script.value = v.script;
         renderVersions();
@@ -197,7 +206,39 @@ export function renderPlaygroundView(ctx) {
         run();
       },
     }, v.label)));
+    ownInputs.textContent = pg.versions?.[pg.version]?.inputs ? `${pg.versions[pg.version].label}'s test event` : '';
+    historyButton.hidden = !pg.source || !ctx.scriptHistory;
+    historyButton.disabled = false;
   }
+  // an earlier version of the script, from the commits that changed it: compared with the one you have
+  const historyButton = h('button.branch-button.play-history', { title: 'The commits that changed this script: pick one to compare with' }, 'History');
+  const histories = new Map();   // source path -> Promise of the list, read once per page
+  historyButton.onclick = async () => {
+    const key = JSON.stringify(pg.source);
+    if (!histories.has(key)) histories.set(key, ctx.scriptHistory(pg.source).catch((e) => { histories.delete(key); throw e; }));
+    historyButton.textContent = 'Reading history…';
+    let list;
+    try { list = await histories.get(key); } catch (e) { historyButton.textContent = 'History'; historyButton.title = `Could not read it: ${e.message}`; return; }
+    historyButton.textContent = 'History';
+    if (!list.length) { historyButton.title = 'No commit on this branch changed this script'; historyButton.disabled = true; return; }
+    const shown = pg.versions?.[0]?.sha || '';
+    const sha = await pickCommit(historyButton, { items: list.map((c) => ({ value: c.sha, label: c.subject, sha: c.sha, author: c.author, date: c.date })), value: shown });
+    const c = list.find((x) => x.sha === sha);
+    if (!c) return;
+    // it takes the older side: the one you have stays as it is
+    const other = pg.versions ? pg.versions[1] : { label: 'Current', script: pg.script };
+    if (pg.versions?.[0]?.inputs && pg.version === 0) { pg.versions[0].inputs = null; pg.inputs = other.inputs || pg.inputs; renderInputs(); }
+    if (other.inputs && pg.version === 1) other.inputs = null;
+    pg.versions = [{ label: c.short, script: c.script, sha: c.sha, title: `${c.subject} · ${c.author}` }, { ...other, inputs: undefined }];
+    pg.version = 0;
+    pg.script = script.value = c.script;
+    renderVersions();
+    persist();
+    run();
+  };
+
+  // shown when the versions' tests give different inputs
+  const ownInputs = h('span.muted.play-own-inputs', { title: 'The MUnit test gives a different event at each commit: each version runs on its own' });
 
   // ---------------------------------------------------------------- playgrounds
 
@@ -246,10 +287,10 @@ export function renderPlaygroundView(ctx) {
       status),
     ctx.engine ? null : h('p.notice', 'The DataWeave CLI is not installed, so scripts cannot run here. See the setup guide.'),
     resizable(h('section.play-col',
-      h('div.play-col-head', h('h3', 'Inputs'), h('span.spacer'), h('a', { onclick: addVar }, '+ Variable'), h('a', { onclick: addAttributes }, '+ Attributes')),
+      h('div.play-col-head', h('h3', 'Inputs'), ownInputs, h('span.spacer'), h('a', { onclick: addVar }, '+ Variable'), h('a', { onclick: addAttributes }, '+ Attributes')),
       inputsList),
     h('section.play-col',
-      h('div.play-col-head', h('h3', 'Script'), h('span.spacer'), versionSwitch),
+      h('div.play-col-head', h('h3', 'Script'), h('span.spacer'), versionSwitch, historyButton),
       script),
     h('section.play-col',
       h('div.play-col-head', h('h3', 'Output')),

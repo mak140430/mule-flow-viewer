@@ -9,6 +9,7 @@ import { lineDiff, align } from './diff.js';
 import { highlightDataWeave, highlightXml, modulePath } from './dataweave.js';
 import { testSamples, runSample, eventInputs, modulesOf } from './chain.js';
 import { propertiesOf, renderRunner } from './runner.js';
+import { scriptSource } from './script-history.js';
 
 const STATUS = { added: 'Added', removed: 'Removed', changed: 'Changed', dependency: 'Imports a changed module' };
 const CONTEXT = 3;
@@ -147,8 +148,9 @@ function scriptDiffs(a, b, ctx) {
     const link = path ? h('p', h('a.mono', { onclick: () => ctx.openDwl(path) }, path)) : null;
     // the newer version can be run (and edited) here too, with inputs from its MUnit tests
     const own = ctx.diff.head.byId.get(b.id);
+    const older = a ? ctx.diff.base.byId.get(a.id) : null;
     const run = after != null && ctx.compareEngine
-      ? renderRunner(after, `diff:${b.file}:${b.id}:${label}`, { ...ctx, project: ctx.diff.head, engine: ctx.compareEngine }, own ? [{ processor: own.item, flow: own.flow }] : [], { before })
+      ? renderRunner(after, `diff:${b.file}:${b.id}:${label}`, { ...ctx, project: ctx.diff.head, engine: ctx.compareEngine }, own ? [{ processor: own.item, flow: own.flow }] : [], { before, base: older ? { project: ctx.diff.base, sites: [{ processor: older.item, flow: older.flow }] } : null, source: own ? scriptSource(own.item, y) : null })
       : null;
     if (x && y && x.resource === y.resource && before === after) {
       return h('details.details-section', h('summary', h('h3.script-label', label)), link, after == null ? null : code(after), run);

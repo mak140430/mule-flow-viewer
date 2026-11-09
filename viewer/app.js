@@ -12,6 +12,7 @@ import { defaultColumns, gridRows, renderGrid } from '../src/core/branch-grid.js
 import { locate } from '../src/core/locate.js';
 import { openPalette } from '../src/core/palette.js';
 import { pickBranch, pickCommit } from '../src/core/branch-picker.js';
+import { scriptHistory } from '../src/core/script-history.js';
 import { paintBlame, clearBlame } from '../src/core/blame.js';
 import { secureConfigs, decryptAll, guardSecrets } from '../src/core/secure.js';
 import { testSamples } from '../src/core/chain.js';
@@ -539,7 +540,8 @@ function renderPlayView() {
   $('panel').hidden = true;
   $('panel-resize').hidden = true;
   renderTree(null, null);
-  $('main').replaceChildren(renderPlaygroundView({ engine, project, env }));
+  $('main').replaceChildren(renderPlaygroundView({ engine, project, env,
+    scriptHistory: adapter.versions ? (source) => adapter.versions(source.path).then((v) => scriptHistory(v, source)) : null }));
   $('main').scrollTop = 0;
 }
 

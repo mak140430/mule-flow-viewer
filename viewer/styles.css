@@ -869,6 +869,9 @@ body.panel-wide #panel-resize { display: none; }
 .play-col { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-sm); overflow: hidden; }
 .play-col-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .play-versions[hidden] { display: none; }
+.play-own-inputs { font-size: 11.5px; }
+.play-history { height: 24px; font-size: 12px; }
+.play-history[hidden] { display: none; }
 .play-versions button { height: 22px; font-size: 12px; padding: 0 10px; }
 .play-col-head h3 { margin: 0; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .play-inputs { flex: 1; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }

@@ -7,6 +7,7 @@ import { sourceOf } from './xml.js';
 import { dwImports, modulePath, dwPropertyRefs, dwLookups, highlightDataWeave, highlightXml } from './dataweave.js';
 import { placeholderKeys } from './properties.js';
 import { renderRunner } from './runner.js';
+import { scriptSource } from './script-history.js';
 
 export const HIDDEN_ATTRS = /^(xmlns(:.*)?|xsi:schemaLocation|doc:id|doc:name)$/;
 
@@ -42,7 +43,7 @@ export function renderDwlDetails(path, ctx) {
     importers.length ? section('Imported by', h('ul.links', importers.map((p) =>
       h('li', h('a', { onclick: () => ctx.openDwl(p) }, p))))) : null,
     d && dependencies(d.code, ctx) ? section('Depends on', dependencies(d.code, ctx)) : null,
-    d ? section('Script', ctx.scriptView ? ctx.scriptView(d.code) : [code(d.code), runnable(d.code) ? runner(d.code, `dwl:${path}`, ctx, users) : null]) : null);
+    d ? section('Script', ctx.scriptView ? ctx.scriptView(d.code) : [code(d.code), runnable(d.code) ? runner(d.code, `dwl:${path}`, ctx, users, { source: { path: `src/main/resources/${path}` } }) : null]) : null);
 }
 
 export function header(icon, title, subtitle, ctx) {
@@ -150,13 +151,13 @@ function scriptSections(p, ctx) {
     const path = s.resource?.replace(/^classpath:\/*/, '');
     return scriptSection(s.label,
       path ? h('p', h('a.mono', { onclick: () => ctx.openDwl(path) }, path)) : null,
-      text == null ? h('p.notice', 'File not found in the project.') : [dependencies(text, ctx), code(text), runner(text, `${p.file}:${p.id}:${s.label}`, ctx, [{ processor: p, flow: ctx.project.byId.get(p.id)?.flow }])]);
+      text == null ? h('p.notice', 'File not found in the project.') : [dependencies(text, ctx), code(text), runner(text, `${p.file}:${p.id}:${s.label}`, ctx, [{ processor: p, flow: ctx.project.byId.get(p.id)?.flow }], { source: scriptSource(p, s) })]);
   });
 }
 
 /** A module that only declares functions has no body to run. */
 const runnable = (text) => /^\s*---\s*$/m.test(text) || !/^\s*%dw/m.test(text);
-const runner = (text, key, ctx, sites) => (ctx.engine ? renderRunner(text, key, ctx, sites.filter((s) => s.flow)) : null);
+const runner = (text, key, ctx, sites, opts) => (ctx.engine ? renderRunner(text, key, ctx, sites.filter((s) => s.flow), opts) : null);
 
 function dependencies(text, ctx) {
   const imports = dwImports(text);

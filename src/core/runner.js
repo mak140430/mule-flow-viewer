@@ -64,14 +64,30 @@ export const formatSize = (n) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 10
  * Collapsed "Run" block; built when first opened.
  * sites: [{processor, flow}] that run the script; MUnit tests reaching them offer input samples.
  */
-export function renderRunner(code, key, ctx, sites = [], { before = null } = {}) {
+export function renderRunner(code, key, ctx, sites = [], { before = null, base = null, source = null } = {}) {
   let body = null;
-  // a changed script: both versions go, on the same inputs (those either one reads), to switch between
-  const withBefore = (data) => {
+  // a changed script: both versions go, to switch between. The inputs are shared (those either one reads), except
+  // when they came from a MUnit test whose event differs at the older commit (base: {project, sites} there): then
+  // Before gets that test's event as it was.
+  const withBefore = async (data) => {
     if (before == null || before === code) return data;
-    const have = new Set(data.inputs.map((i) => i.name));
-    const inputs = [...data.inputs, ...inputsOf(before).filter((i) => !have.has(i.name)).map(({ name, mime, text }) => ({ name, mime, text }))];
-    return { ...data, inputs, versions: [{ label: 'Before', script: before }, { label: 'After', script: data.script }], version: 1 };
+    const add = (inputs, script) => {
+      const have = new Set(inputs.map((i) => i.name));
+      return [...inputs, ...inputsOf(script).filter((i) => !have.has(i.name)).map(({ name, mime, text }) => ({ name, mime, text }))];
+    };
+    const after = add(data.inputs, before);
+    let older = null;
+    const sample = data.test && base ? testSamples(base.project, base.sites).find((x) => x.test.name === data.test) : null;
+    if (sample) {
+      const filled = await sampleInputs(sample, before, { ...ctx, project: base.project }).catch(() => null);
+      if (filled && JSON.stringify(filled.inputs) !== JSON.stringify(data.inputs)) older = add(filled.inputs, data.script);
+    }
+    return {
+      script: data.script,
+      inputs: after,
+      versions: [{ label: 'Before', script: before, ...(older ? { inputs: older } : {}) }, { label: 'After', script: data.script, ...(older ? { inputs: after } : {}) }],
+      version: 1,
+    };
   };
   // the script and its inputs in a playground, without opening the block: what Run would start from
   const toPlay = ctx.openPlayground ? h('a.run-to-play', { title: 'The script, its variables and its inputs (yours, or a MUnit test\'s) in a new playground' }, 'Open in playground') : null;
@@ -80,10 +96,9 @@ export function renderRunner(code, key, ctx, sites = [], { before = null } = {})
     toPlay.onclick = async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (body) return ctx.openPlayground({ name, ...withBefore(body.current()) });
       toPlay.textContent = 'Running the test…';
       try {
-        ctx.openPlayground({ name, ...withBefore(await startingInputs(code, key, ctx, sites)) });
+        ctx.openPlayground({ name, source, ...(await withBefore(body ? body.current() : await startingInputs(code, key, ctx, sites))) });
       } finally { toPlay.textContent = 'Open in playground'; }
     };
   }
@@ -102,7 +117,7 @@ async function startingInputs(code, key, ctx, sites) {
   const samples = !yours && sites.length ? testSamples(ctx.project, sites) : [];
   if (samples.length) {
     const filled = await sampleInputs(samples[0], code, ctx).catch(() => null);
-    if (filled) return { script, inputs: filled.inputs };
+    if (filled) return { script, inputs: filled.inputs, test: samples[0].test.name };
   }
   const extra = Object.keys(saved).filter((n) => n.startsWith('vars.')).map((n) => ({ name: n }));
   return { script, inputs: [...inputsOf(script), ...extra].map((i) => ({ name: i.name, mime: saved[i.name]?.mime ?? i.mime ?? JSON_MIME, text: saved[i.name]?.text ?? i.text ?? '' })) };
@@ -159,7 +174,7 @@ function runnerBody(code, key, ctx, sites, opts = {}) {
     input.file = null;
     const area = h('textarea.mono', { spellcheck: 'false', rows: 8 });
     input.text = area.value = input.text ?? '';
-    area.oninput = () => { input.text = area.value; schedule(); };
+    area.oninput = () => { input.text = area.value; touched = true; schedule(); };
     area.onkeydown = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run(); } };
     const picker = h('input', { type: 'file', hidden: true });
     const fileRow = h('div.run-file');
@@ -237,6 +252,7 @@ function runnerBody(code, key, ctx, sites, opts = {}) {
 
   const samples = sites.length ? testSamples(ctx.project, sites) : [];
   let manual = null;    // the user's own inputs while a test sample is shown
+  let touched = false;  // an input edited since the sample was picked: they are the user's now
   const source = samples.length ? h('select.run-source', {
     title: 'Inputs',
     onchange: (e) => { e.target.title = e.target.selectedOptions[0].text; useSample(samples[e.target.value]); },
@@ -263,6 +279,7 @@ function runnerBody(code, key, ctx, sites, opts = {}) {
       }
       const { inputs, r } = results.get(sample);
       editors = inputs.map((i) => editor({ ...base.find((b) => b.name === i.name), ...i }));
+      touched = false;
       layout();
       schedule();
       const unknown = keys.filter((k) => !r.vars.has(k) && r.unknownVars.has(k));
@@ -349,6 +366,10 @@ function runnerBody(code, key, ctx, sites, opts = {}) {
   if (live.checked && opts.live) setTimeout(run);
   const body = h('div.run-body', h('div.run-edit', h('div.run-head', tabs, source), sampleNote, panes, h('div.run-actions', button, liveLabel, status)), output);
   // the script and its inputs as they are now (for "Open in playground")
-  body.current = () => ({ script, inputs: editors.map(({ input }) => ({ name: input.name, mime: input.mime, text: input.text })) });
+  body.current = () => ({
+    script,
+    inputs: editors.map(({ input }) => ({ name: input.name, mime: input.mime, text: input.text })),
+    test: source?.value && !touched ? samples[source.value].test.name : null,
+  });
   return body;
 }
