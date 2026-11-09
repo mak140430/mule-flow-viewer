@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mule Flow Viewer",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Mule 4 flows as Studio draws them, from Azure DevOps, GitHub, GitLab or Bitbucket: branches, history, pull requests, checks.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1CP7sS5xXCNN4cGs94C1sUu5DdX4dc91sddLH6lF722q91baM7TrtLgRkDRfDQwYDM8dht3luJsnu5Qq1uqpOz4Hf5rWUeI116GYlsfWx449dbasCI1x1/r4vAdQbhRJjL/t0tuJGMk7IzCyu6HqyvQfDRhBmw9Z+EySIVGJgZyH8dkfd3Z3VE6ILE6tBkSxszViz0lF5cfvvNWtaFFC9XSuwRh2LnCdUbrEE1OuczEpxxHjrMH+87GGAu/tkgALWJsLoJzW+SGW/r7OCc7c54nCCX0jcMN/wCZqQcC9kmQbF92bJLZnwz0z/IG7UD+Gfmu7vCtqXvpQA7xGacfTjQIDAQAB",
   "minimum_chrome_version": "120",
