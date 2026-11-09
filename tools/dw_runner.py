@@ -101,8 +101,11 @@ class Runner:
             var_files = [k for k in inputs if VAR_INPUT.match(k)]
             header = []
             if var_files:
-                merged = ", ".join(f"{json.dumps(k[5:]).replace('$', chr(92) + '$')}: mfvVar{i}" for i, k in enumerate(var_files))
-                header = [f"var vars = {'(mfvVars default {})' if 'vars' in inputs else '{}'} ++ {{{merged}}}"]
+                names = [json.dumps(k[5:]).replace('$', chr(92) + '$') for k in var_files]
+                merged = ", ".join(f"{n}: mfvVar{i}" for i, n in enumerate(names))
+                # a "vars.<key>" input replaces that key of "vars": ++ alone keeps both, and vars.<key> reads the first
+                rest = f"((mfvVars default {{}}) filterObject ((v, k) -> !([{', '.join(names)}] contains (k as String))))"
+                header = [f"var vars = {rest if 'vars' in inputs else '{}'} ++ {{{merged}}}"]
             for name, spec in inputs.items():
                 # munitResources: test resource files that MUnit sample values read (see munit.js)
                 if name not in ("payload", "vars", "attributes", "error", "munitResources") and name not in var_files:

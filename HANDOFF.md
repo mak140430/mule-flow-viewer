@@ -33,3 +33,6 @@
   --password-store=basic` (store_screenshots.mjs, e2e_chrome.mjs); keep it on any new launcher.
 - Image export (Copy image / PNG / SVG) uses the flow's card on the canvas, else draws the flow just for the image:
   never return silently when the card isn't there.
+- DataWeave inputs: a `vars.<key>` input must replace that key of the `vars` input (dw_runner.py filters it out
+  before `++`). `++` on objects keeps duplicate keys and `vars.<key>` reads the first, so an outline's `"key": null`
+  used to hide the value typed for it.
