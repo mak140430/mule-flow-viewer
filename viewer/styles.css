@@ -1022,3 +1022,9 @@ details.endpoint.kind-api > summary { padding-left: 34px; }
 .bar-row.link { cursor: pointer; }
 .bar-row.link:hover .bar-label { color: var(--accent); }
 .bar-row:hover .bar { filter: brightness(1.15); }
+
+/* a branch comparison: what the other branch did since they split is dimmed */
+#main .by-base { opacity: .5; }
+#main .by-base:hover { opacity: .85; }
+.diff-file-head .diff-side { margin-left: 10px; font: 12px var(--sans); }
+.diff-status .diff-side { margin-top: 4px; font-weight: 500; }

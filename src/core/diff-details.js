@@ -5,7 +5,7 @@ import { h } from './dom.js';
 import { renderDetails, renderDwlDetails, header, section, scriptSection, code, HIDDEN_ATTRS } from './details.js';
 import { scriptsOf } from './model.js';
 import { sourceOf } from './xml.js';
-import { lineDiff, align } from './diff.js';
+import { lineDiff, align, sideText } from './diff.js';
 import { highlightDataWeave, highlightXml, modulePath } from './dataweave.js';
 import { testSamples, runSample, eventInputs, modulesOf } from './chain.js';
 import { propertiesOf, renderRunner } from './runner.js';
@@ -17,6 +17,9 @@ const CONTEXT = 3;
 /** ctx: the details ctx plus {diff} from diffProjects; ctx.project is the newer version. */
 export function renderDiffDetails(item, ctx) {
   const el = renderItemDiff(item, ctx);
+  // two branches compared: which of them made this difference
+  const side = ctx.diff.sides?.items.get(item.id);
+  if (side) el.querySelector('.diff-status')?.append(h('div.diff-side', sideText(item.diff, side, ctx.diff.sides.names)));
   return ctx.diff.conflicts?.has(item.id) ? insertAfterHeader(el, conflictNote(ctx)) : el;
 }
 

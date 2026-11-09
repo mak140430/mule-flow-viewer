@@ -2,7 +2,7 @@ import { loadProject } from '../src/core/project.js';
 import { Icons } from '../src/core/icons.js';
 import { renderConfig } from '../src/core/render.js';
 import { renderDetails, renderDwlDetails } from '../src/core/details.js';
-import { diffProjects, resourcePath, sameElement, elementIdent, isChange } from '../src/core/diff.js';
+import { diffProjects, resourcePath, sameElement, elementIdent, isChange, sidesOf, sideText } from '../src/core/diff.js';
 import { highlightXml } from '../src/core/dataweave.js';
 import { renderDiffDetails, renderDwlDiff, renderPropertiesDiff } from '../src/core/diff-details.js';
 import { h, installTooltips } from '../src/core/dom.js';
@@ -172,7 +172,7 @@ async function route() {
       $('main').replaceChildren(h('div.empty-state', 'Loading…'));
       let d;
       try {
-        d = await loadDiff(rev, s.base, s.vs);
+        d = await loadDiff(rev, s.base, s.vs, s);
       } catch (e) {
         if (seq === routeSeq) $('main').replaceChildren(h('p.notice', `Could not load ${rev}: ${e.message}`));
         return;
@@ -213,7 +213,7 @@ async function route() {
   if (fileChanged || (diff && otherFile)) renderXml(file, s);
   if (fileChanged && !diff) paintCanvas(file);
   if (fileChanged && !diff) markChecks($('main'), projectChecks());
-  if (fileChanged && diff) markUntested(diff);
+  if (fileChanged && diff) { markUntested(diff); markSides(diff); }
   const behavior = fileChanged ? 'instant' : 'smooth';
   const lines = fileChanged && parseLines(s.L);
   if (lines) pointAt(...lines, true);
@@ -257,7 +257,7 @@ function projectAt(rev) {
 }
 
 /** The diff for the URL's comparison; d.revs = {base, head} (head null: the working tree). */
-async function loadDiff(rev, base, vs) {
+async function loadDiff(rev, base, vs, { with: withName, ref } = {}) {
   let d;
   if (rev === WORKTREE) {
     d = diffProjects(await projectAt('HEAD'), live);
@@ -268,8 +268,15 @@ async function loadDiff(rev, base, vs) {
     d = markConflicts(diffProjects(older, newer), diffProjects(older, other));
     d.revs = { base, head: rev };
   } else if (base) {
-    d = diffProjects(...await Promise.all([projectAt(base), projectAt(rev)]));
+    const [older, newer] = await Promise.all([projectAt(base), projectAt(rev)]);
+    d = diffProjects(older, newer);
     d.revs = { base, head: rev };
+    // two branches tip to tip: which of them made each difference, from where they split
+    const split = withName && adapter.mergeBase ? await adapter.mergeBase(base, rev).catch(() => null) : null;
+    if (split && split !== base && split !== rev) {
+      const at = await projectAt(split).catch(() => null);
+      if (at) d.sides = { ...sidesOf(d, diffProjects(at, newer), diffProjects(at, older)), names: { head: ref || 'this branch', base: withName } };
+    }
   } else {
     const commit = [...(log.all?.commits || []), ...(log.file?.commits || [])].find((c) => c.sha === rev || c.short === rev);
     const parent = commit ? commit.parents[0] || '' : `${rev}^`;
@@ -495,7 +502,8 @@ function renderCanvas(file, selectedId) {
     const ctx = canvasCtx(selectedId);
     main.append(...[...diff.configs.values()].filter((c) => c.status || c.textChanged).map((c) => h('section.diff-file', { dataset: { file: c.path } },
       h('div.diff-file-head', h(`span.st.${c.status || 'changed'}${c.textChanged ? '' : '.indirect'}`, STATUS_LETTER[c.status] || (c.textChanged ? 'M' : '•')),
-        c.path.replace(MULE_DIR, '')),
+        c.path.replace(MULE_DIR, ''),
+        diff.sides?.files.get(c.path) ? h('span.muted.diff-side', sideText(c.status || 'changed', diff.sides.files.get(c.path), diff.sides.names)) : null),
       renderConfig(c, ctx))));
     main.scrollTop = 0;
     return;
@@ -1009,6 +1017,18 @@ const untested = new WeakMap();   // diff -> Set of ids of changed elements no M
  * Marks the diff's added and changed elements that no MUnit test (in the newer version) runs through.
  * Done in slices so a large diff never blocks the page.
  */
+/** A branch comparison: differences the other branch made are dimmed, and each says who made it. */
+function markSides(d) {
+  if (!d.sides) return;
+  for (const [id, side] of d.sides.items) {
+    const item = d.byId.get(id)?.item;
+    for (const el of $('main').querySelectorAll(`[data-id="${CSS.escape(id)}"]`)) {
+      el.classList.toggle('by-base', side === 'base');
+      el.title = sideText(item?.diff, side, d.sides.names);
+    }
+  }
+}
+
 async function markUntested(d) {
   if (!untested.has(d)) {
     const head = d.head;

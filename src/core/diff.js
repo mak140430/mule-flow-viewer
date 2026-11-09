@@ -364,3 +364,34 @@ export function lineDiff(before, after) {
 }
 
 export const resourcePath = (path) => (path.startsWith(RES_DIR) ? path.slice(RES_DIR.length) : null);
+
+/**
+ * Two branches compared tip to tip: which side made each difference since they split (mergeBase: the project where
+ * they did). headSide = diffProjects(mergeBase, head), baseSide = diffProjects(mergeBase, base).
+ * {items: id -> 'head' | 'base' | 'both', files: path -> the same} for the differences of d.
+ */
+export function sidesOf(d, headSide, baseSide) {
+  const changed = (x) => new Set([...x.byId.values()].filter((e) => isChange(e.item)).map(elementIdent));
+  const h = changed(headSide);
+  const b = changed(baseSide);
+  const side = (onHead, onBase) => (onHead && onBase ? 'both' : onHead ? 'head' : onBase ? 'base' : null);
+  const items = new Map();
+  for (const e of d.byId.values()) {
+    if (!isChange(e.item)) continue;
+    const k = elementIdent(e);
+    const s = side(h.has(k), b.has(k));
+    if (s) items.set(e.item.id, s);
+  }
+  const hf = new Set(headSide.files.map((f) => f.path));
+  const bf = new Set(baseSide.files.map((f) => f.path));
+  const files = new Map(d.files.map((f) => [f.path, side(hf.has(f.path), bf.has(f.path))]).filter(([, s]) => s));
+  return { items, files };
+}
+
+/** "Deleted on feature/x", "Added on main after feature/x branched off", ...: a difference of a branch comparison, by who made it. */
+export function sideText(state, side, { head, base }) {
+  if (side === 'both') return 'Both branches changed it since they split';
+  if (state === 'removed') return side === 'head' ? `Deleted on ${head}` : `Added on ${base} after ${head} branched off`;
+  if (state === 'added') return side === 'head' ? `Added on ${head}` : `Deleted on ${base} after ${head} branched off`;
+  return side === 'head' ? `Changed on ${head}` : `Changed on ${base} after ${head} branched off`;
+}
