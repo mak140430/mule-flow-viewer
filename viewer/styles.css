@@ -989,8 +989,11 @@ details.endpoint.kind-api > summary { padding-left: 34px; }
 .call-none { padding: 8px 14px; margin: 0; }
 .matrix-filter { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12.5px; }
 .matrix-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-sm); }
-.env-matrix td { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; cursor: pointer; }
-.env-matrix td.key { white-space: normal; overflow-wrap: anywhere; cursor: default; max-width: 340px; }
+/* the key column has its own width; the environments share the rest equally, values cut short with … */
+.env-matrix { table-layout: fixed; }
+.env-matrix th:first-child { width: clamp(200px, 26%, 340px); }
+.env-matrix td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; cursor: pointer; }
+.env-matrix td.key { white-space: normal; overflow-wrap: anywhere; cursor: default; }
 .env-matrix td.common { color: var(--muted); }
 .env-matrix td.missing { color: var(--del); cursor: default; }
 .env-matrix td:not(.key):not(.missing):hover { background: var(--raised); }
