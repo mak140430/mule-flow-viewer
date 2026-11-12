@@ -24,7 +24,7 @@ export function propertyRefs(project) {
 const envFile = (path, env) => new RegExp(`[-_/.]${env}\\.[a-z]+$`).test(path);
 
 /**
- * {columns: [env], rows: [{key, cells: [{value, file, line, own (from the environment's file), encrypted, plain
+ * {columns: [env], rows: [{key, cells: [{value, file, line, own (from the environment's file), encrypted, decrypted, plain
  * (a secret in plain text)} | null], refs, problems: [{severity, text}]}]}. Without environments: one column, null.
  */
 export function envMatrix(project, { libraryTexts = [] } = {}) {
@@ -47,6 +47,8 @@ export function envMatrix(project, { libraryTexts = [] } = {}) {
         value, file: r.file, line: r.line,
         own: env ? envFile(r.file, env) : true,
         encrypted: /^!\[/.test(value),
+        // decrypted with the environment's key, once given (secure.js; kept in this tab only)
+        decrypted: /^!\[/.test(value) ? project.secrets?.get(env)?.get(key) ?? null : null,
         plain: SECRET_KEY.test(key) && !!value && !/^!\[/.test(value) && !/\$\{/.test(value),
       };
     });

@@ -7,6 +7,7 @@ import { entryPoints, outboundCalls, errorsOf, OTHER } from './surface.js';
 import { envMatrix } from './env-matrix.js';
 import { compareVersions } from '../adapters/git-host.js';
 import { pickBranch } from './branch-picker.js';
+import { propertyValue } from './details.js';
 
 export const TABS = [['endpoints', 'Entry points'], ['calls', 'Calls'], ['properties', 'Properties'], ['libraries', 'Libraries'], ['commits', 'Commits']];
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -119,20 +120,35 @@ function callsTab(ctx) {
 
 // ------------------------------------------------------------------ properties across environments
 
+const KEY_ICON = () => {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  Object.entries({ viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }).forEach(([k, v]) => svg.setAttribute(k, v));
+  svg.innerHTML = '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-3 3 2 2m-5 1 2 2"/>';
+  return svg;
+};
+
 function propertiesTab(ctx) {
   const m = envMatrix(ctx.project, { libraryTexts: ctx.libraryTexts });
   if (!m.rows.length) return { el: h('p.muted', 'This app has no properties.') };
   const fix = m.rows.filter((r) => r.problems.some((p) => p.severity !== 'info'));
   const table = h('table.trace-vars.env-matrix');
+  // columns with encrypted values get a key button
+  const locked = m.columns.map((c, i) => !!c && m.rows.some((r) => r.cells[i]?.encrypted));
   const draw = (only) => {
     const rows = only ? fix : m.rows;
     table.replaceChildren(
-      h('thead', h('tr', h('th', ''), m.columns.map((c) => h('th', c || 'Value')))),
+      h('thead', h('tr', h('th', ''), m.columns.map((c, i) => h('th', c || 'Value', locked[i] && ctx.askKey
+        ? h(`button.icon-btn.col-key${ctx.hasKey?.(c) ? '.active' : ''}`, { title: `Key for the ${c} secure:: values`, onclick: (e) => ctx.askKey(c, e.currentTarget) }, KEY_ICON())
+        : null)))),
       h('tbody', rows.map((r) => h('tr',
         h('td.mono.key', r.key, r.problems.map((p) => h('div.problem', h(`span.check-dot.${p.severity}`), p.text))),
-        r.cells.map((c) => {
+        r.cells.map((c, i) => {
+          const env = m.columns[i];
           if (!c) return h('td.missing', '—');
-          const text = c.encrypted ? h('span.chip', 'encrypted') : c.plain ? h('span.chip.warn', 'plain text') : c.value || h('span.muted', '(empty)');
+          const text = c.decrypted != null ? propertyValue({ value: c.decrypted, secure: true }, ctx)
+            : c.encrypted ? h('span.chip', { title: `Encrypted: give the ${env} key`, onclick: (e) => { e.stopPropagation(); ctx.askKey?.(env, e.currentTarget); } }, 'encrypted')
+              : c.plain ? h('span.chip.warn', 'plain text') : c.value || h('span.muted', '(empty)');
           return h(`td.mono${c.own ? '' : '.common'}`, { title: `${c.file}:${c.line}${c.own ? '' : ' (shared by the environments)'}`, onclick: () => ctx.openSource(c.file, c.line) }, text);
         })))));
   };

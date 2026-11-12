@@ -997,6 +997,9 @@ details.endpoint.kind-api > summary { padding-left: 34px; }
 .env-matrix td.common { color: var(--muted); }
 .env-matrix td.missing { color: var(--del); cursor: default; }
 .env-matrix td:not(.key):not(.missing):hover { background: var(--raised); }
+.env-matrix .col-key { width: 22px; height: 22px; margin-left: 6px; vertical-align: middle; display: inline-flex; align-items: center; justify-content: center; }
+.env-matrix .col-key.active { color: var(--accent); border-color: var(--accent); }
+.env-matrix .chip { cursor: pointer; }
 .env-matrix .problem { font: 11.5px var(--sans); color: var(--muted); white-space: normal; margin-top: 2px; }
 .chip.warn { color: var(--mod); border-color: var(--mod); }
 .lib-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2px 16px; padding: 10px 14px; }

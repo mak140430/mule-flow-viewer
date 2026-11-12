@@ -1204,6 +1204,8 @@ function renderOverviewRoute(s) {
     libraryTexts: [...new Set([...(libs?.values() || [])].map((x) => x.project))].flatMap((p) => [...p.texts.values()]),
     libraryMap: adapter.libraryMap || null,
     repoName: adapter.repo || adapter.name,
+    askKey,
+    hasKey: (e) => !!keyFor(e),
     commits: adapter.commitsOn && adapter.branches ? { branches: () => adapter.branches(), on: commitsOn } : null,
     onTab: (tab) => writeHash({ file: readHash().file, app: tab }, false),
     openFlow: (name) => navigate(name),
@@ -1276,15 +1278,32 @@ async function applySecrets(p, e, key = keyFor(e)) {
   return r;
 }
 
-/** The current environment's key applied to the live project and every version loaded so far. */
+/**
+ * Every environment's key given in this tab, applied to the live project and every version loaded so far (the
+ * Properties table shows them all); the button lights up when the selected environment's values are decrypted.
+ */
 async function applySecretsEverywhere() {
-  const r = await applySecrets(live, env);
-  for (const p of projectsAt.values()) p.then((loaded) => applySecrets(loaded, env)).catch(() => {});
+  const envs = live.environments.length ? live.environments : [env];
+  const results = await Promise.all(envs.map((e) => applySecrets(live, e)));
+  const loaded = await Promise.all([...projectsAt.values()].map((p) => p.catch(() => null)));
+  await Promise.all(loaded.filter(Boolean).flatMap((p) => envs.map((e) => applySecrets(p, e).catch(() => null))));
+  const r = results[envs.indexOf(env)];
   $('secure-key').classList.toggle('active', !!r?.values.size);
   return r;
 }
 
-function askKey() {
+/** After a key is given or forgotten, or Env changes: what shows property values draws them again. */
+function redrawValues() {
+  const s = readHash();
+  if (s.app) renderOverviewRoute(s);
+  else renderPanel(s);
+}
+
+/**
+ * The key for one environment's secure:: values (the selected one unless `forEnv` says), in a popover under `anchor`.
+ * A key that works is also tried on the environments without one: projects often share a key.
+ */
+function askKey(forEnv = env, anchor = $('secure-key')) {
   document.querySelector('.popover')?.remove();
   const cfg = secureConfigs(live)[0];
   if (!cfg) return;
@@ -1294,27 +1313,31 @@ function askKey() {
   const submit = async () => {
     const key = input.value;
     if (!key) return;
-    const r = await applySecrets(live, env, key).catch((e) => ({ values: new Map(), errors: [{ message: e.message }] }));
+    const r = await applySecrets(live, forEnv, key).catch((e) => ({ values: new Map(), errors: [{ message: e.message }] }));
     const wrong = r.errors.filter((x) => x.message === 'wrong key');
     if (!r.values.size) {
-      note.textContent = r.errors.length && !wrong.length ? r.errors[0].message : `That key does not decrypt the ${env} values.`;
+      note.textContent = r.errors.length && !wrong.length ? r.errors[0].message : `That key does not decrypt the ${forEnv} values.`;
       note.classList.add('error');
       return;
     }
-    keepKey(env, key);
+    keepKey(forEnv, key);
+    for (const other of live.environments.filter((x) => x !== forEnv && !keyFor(x))) {
+      const t = await decryptAll(live, other, key).catch(() => null);
+      if (t?.values.size && !t.errors.some((x) => x.message === 'wrong key')) keepKey(other, key);
+    }
     await applySecretsEverywhere();
     pop.remove();
-    renderPanel(readHash());
+    redrawValues();
   };
   input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
-  const known = !!keyFor(env);
+  const known = !!keyFor(forEnv);
   const pop = h('div.popover.secure-pop',
-    h('div.pop-group', `secure:: properties · ${env}`),
+    h('div.pop-group', `secure:: properties · ${forEnv}`),
     h('div.secure-row', input, h('button.run-button', { onclick: submit }, 'Decrypt')),
     note,
     h('div.muted.secure-note', `${cfg.algorithm}/${cfg.mode}${cfg.randomIvs ? ', random IVs' : ''} (from ${cfg.name || 'the secure properties config'}). Kept in this tab only, never saved or sent.`),
-    known ? h('a', { onclick: async () => { keepKey(env, null); await applySecretsEverywhere(); pop.remove(); renderPanel(readHash()); } }, 'Forget the key') : null);
-  const box = $('secure-key').getBoundingClientRect();
+    known ? h('a', { onclick: async () => { keepKey(forEnv, null); await applySecretsEverywhere(); pop.remove(); redrawValues(); } }, 'Forget the key') : null);
+  const box = anchor.getBoundingClientRect();
   pop.style.top = `${box.bottom + 6}px`;
   pop.style.left = `${Math.max(8, Math.min(box.left - 140, window.innerWidth - 340))}px`;
   document.body.append(pop);
@@ -1490,10 +1513,10 @@ function setupControls() {
     env = $('env').value;
     prefs.set('env', env);
     await applySecretsEverywhere();
-    renderPanel(readHash());
+    redrawValues();
   };
   $('secure-key').hidden = !secureConfigs(live).length;
-  $('secure-key').onclick = askKey;
+  $('secure-key').onclick = () => askKey();
 
   $('history').hidden = !adapter.history;
   $('colour-wrap').hidden = !adapter.versions;
